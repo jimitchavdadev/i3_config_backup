@@ -71,3 +71,8 @@ fi
 if command -v i3-msg >/dev/null 2>&1; then
     i3-msg reload >/dev/null 2>&1 || true
 fi
+
+# Pre-cache aesthetic lock screen background in background
+if [ -x "$HOME/.config/i3/scripts/generate_lock_screen.py" ]; then
+    nohup "$HOME/.config/i3/scripts/generate_lock_screen.py" --cache-base >/dev/null 2>&1 &
+fi
