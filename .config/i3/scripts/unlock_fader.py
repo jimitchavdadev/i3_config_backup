@@ -428,13 +428,8 @@ class BloodKatanaFader:
                         self.window.queue_draw()
 
                     if code in (28, 96):  # ENTER or KP_ENTER
-                        if self.keys_typed > 0 or self.has_typed:
-                            self.keys_typed = 0
-                            self.has_typed = False
-                            # Start fallback timer: if PAM does not unlock within 450ms, it's incorrect
-                            if self.pending_auth_timer is not None:
-                                GLib.source_remove(self.pending_auth_timer)
-                            self.pending_auth_timer = GLib.timeout_add(450, self.on_auth_timeout)
+                        self.keys_typed = 0
+                        self.has_typed = False
                     elif code == 14:  # BACKSPACE
                         self.keys_typed = max(0, self.keys_typed - 1)
                         self.trigger_keystroke_slash(is_backspace=True)
@@ -447,12 +442,6 @@ class BloodKatanaFader:
         except Exception:
             pass
         return True
-
-    def on_auth_timeout(self):
-        """Fallback timer: Enter was pressed but no unlock occurred -> wrong password!"""
-        self.pending_auth_timer = None
-        self.trigger_wrong_password_eye()
-        return False
 
     def trigger_keystroke_slash(self, is_backspace=False):
         """Spawns a tiny blood slash inside each monitor's Ensō circle."""
@@ -517,8 +506,8 @@ class BloodKatanaFader:
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
 
-        # 2. Render Red Blasting Eye (Wrong Password)
-        if self.wrong_eyes:
+        # 2. Render Demonic Eye (Wrong Password ONLY - never during final unlock slash!)
+        if self.wrong_eyes and not self.final_animating:
             for eye in self.wrong_eyes:
                 eye.draw(cr, now)
 
@@ -660,6 +649,8 @@ class BloodKatanaFader:
         self.final_animating = True
         self.final_start_time = time.time()
         self.cleanup_fds()
+        self.wrong_eyes.clear()
+        self.tiny_slashes.clear()
 
         if self.tick_timer_id is None:
             self.tick_timer_id = GLib.timeout_add(16, self.on_tick)

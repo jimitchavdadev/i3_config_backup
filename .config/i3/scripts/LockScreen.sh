@@ -57,7 +57,7 @@ fi
 
 # Run i3lock with unbuffered pipes and monitor for Authentication failure in real-time
 while IFS= read -r line; do
-    if [[ "$line" == *"Authentication failure"* ]] || [[ "$line" == *"Wrong"* ]] || [[ "$line" == *"clearing auth wrong"* ]]; then
+    if [[ "$line" == *"Authentication failure"* ]]; then
         if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
             echo "WRONG" >&"${FADER[1]}" 2>/dev/null || true
             kill -USR2 "$FADER_PID" 2>/dev/null || true
