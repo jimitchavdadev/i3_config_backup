@@ -244,7 +244,11 @@ class BloodKatanaFader:
             })
 
         # Override-redirect POPUP window covering all monitors
+        GLib.set_prgname("unlock_fader")
+        GLib.set_application_name("unlock_fader")
         self.window = Gtk.Window(type=Gtk.WindowType.POPUP)
+        self.window.set_wmclass("unlock_fader", "unlock_fader")
+        self.window.set_role("lockscreen_overlay")
         self.window.set_default_size(self.width, self.height)
         self.window.set_size_request(self.width, self.height)
         self.window.move(0, 0)
