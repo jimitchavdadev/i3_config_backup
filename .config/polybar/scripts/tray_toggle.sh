@@ -40,10 +40,10 @@ while read -r line; do
     fi
 done < <(xrandr --query 2>/dev/null | grep " connected")
 
-box_w=220
+box_w=340
 target_x=$(( X - (box_w / 2) ))
-min_allowed=$(( mon_x + 8 ))
-max_allowed=$(( mon_x + mon_w - box_w - 8 ))
+min_allowed=$(( mon_x + 10 ))
+max_allowed=$(( mon_x + mon_w - box_w - 10 ))
 
 if [ "$target_x" -lt "$min_allowed" ]; then
     target_x="$min_allowed"
@@ -51,7 +51,7 @@ fi
 if [ "$target_x" -gt "$max_allowed" ]; then
     target_x="$max_allowed"
 fi
-target_y=44
+target_y=50
 
 if [ "$is_mapped" -eq 1 ]; then
     curr_x=$(xwininfo -id "$WID" 2>/dev/null | grep "Absolute upper-left X:" | awk '{print $4}' || echo 0)
