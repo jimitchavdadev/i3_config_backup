@@ -1,62 +1,38 @@
 #!/usr/bin/env python3
 """
-Blade Runner 2049 Multi-Monitor Screen Locker for i3
-Philosophical, futuristic, and atmospheric design inspired by Denis Villeneuve & Roger Deakins.
-Features Wallace Corp typography, Baseline Test echoes, warm amber atmospheric haze,
-tracked lettering, and an ultra-delicate circular reticle framing i3lock's indicator.
+Vagabond (Miyamoto Musashi) Philosophical Lock Screen Generator for i3
+Inspired by Takehiko Inoue's legendary manga 'Vagabond'.
+Features Sumi-e ink wash aesthetics, authentic Zen Ensō brush circle framing the
+unlock indicator, traditional Japanese calligraphy (Noto Serif CJK), vermilion Hanko seal,
+and profound philosophical quotes from Musashi and Takuan Sōhō.
 """
 
 import os
 import re
 import sys
+import math
 import subprocess
 from datetime import datetime
-from PIL import Image, ImageFilter, ImageDraw, ImageFont
+from PIL import Image, ImageFilter, ImageDraw, ImageFont, ImageEnhance
 
 BASE_CACHE_IMG = "/tmp/i3lock_blurred_base.png"
 BASE_CACHE_META = "/tmp/i3lock_base.meta"
 OUTPUT_LOCK_IMG = "/tmp/i3lock_aesthetic.png"
 
-# Blade Runner 2049 Palette (Roger Deakins Cinematic Grade)
-BG_HEX = "120E10"
-BG_COLOR = (18, 14, 16)             # Deep obsidian / umber shadow
-IVORY_WHITE = (245, 238, 224)       # Warm ivory / cream white
-AMBER_GOLD = (235, 150, 70)         # Wallace Corp Golden Amber
-MUTED_AMBER = (180, 115, 65)        # Weathered sepia / desert bronze
-MIST_SLATE = (165, 178, 185)        # Atmospheric fog / rain slate
-HAZE_TINT = (35, 20, 15)            # Warm ambient cinematic haze
+# Vagabond Classical Japanese Palette
+BG_HEX = "0F0E10"
+BG_COLOR = (15, 14, 16)             # Deep Sumi Charcoal Ink
+WASHI_WHITE = (245, 239, 234)       # Handcrafted Washi / Rice Paper
+INK_MUTED = (160, 154, 148)         # Washed ink gray
+INK_FAINT = (115, 110, 106)         # Distant mist gray
+VERMILION_RED = (184, 50, 39)       # Traditional Inkan / Cinnabar Red (#B83227)
+SEAL_FILL = (184, 50, 39, 45)       # Translucent vermilion seal wash
 
 def hex_to_rgb(h):
     h = h.strip().lstrip("#")
     if len(h) == 6:
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
     return None
-
-def load_theme_colors():
-    global BG_HEX, BG_COLOR, IVORY_WHITE, AMBER_GOLD, MUTED_AMBER, MIST_SLATE
-    colors_file = os.path.expanduser("~/.config/polybar/colors.ini")
-    if os.path.isfile(colors_file):
-        try:
-            with open(colors_file) as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("background ="):
-                        raw = line.split("=")[1].strip().lstrip("#")
-                        c = hex_to_rgb(raw)
-                        if c:
-                            BG_COLOR = c
-                            BG_HEX = raw
-                    elif line.startswith("foreground ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: IVORY_WHITE = c
-                    elif line.startswith("color13 =") or line.startswith("primary ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: AMBER_GOLD = c
-                    elif line.startswith("secondary =") or line.startswith("disabled ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: MIST_SLATE = c
-        except Exception:
-            pass
 
 def get_monitors():
     monitors = []
@@ -91,6 +67,11 @@ def get_monitors():
     return monitors, total_w, total_h
 
 def get_wallpaper_path():
+    # Prioritize user's samurai wallpaper for the authentic Vagabond atmosphere
+    samurai_wall = os.path.expanduser("~/Pictures/wallpapers/samurai.jpg")
+    if os.path.isfile(samurai_wall):
+        return samurai_wall
+
     curr_wall_file = os.path.expanduser("~/.config/i3/wallpaper_effects/.wallpaper_current")
     if os.path.isfile(curr_wall_file):
         try:
@@ -100,28 +81,33 @@ def get_wallpaper_path():
                     return p
         except Exception:
             pass
+
     fallback = os.path.expanduser("~/Pictures/wallpapers/Techno-Geek.png")
     if os.path.isfile(fallback):
         return fallback
     return None
 
-def cover_and_blur(src_img, tw, th):
-    """Aspect-fill (cover) crop and smooth Gaussian blur."""
+def cover_and_sumie(src_img, tw, th):
+    """Aspect-fill crop, desaturate to manga ink wash, and apply soft atmospheric blur."""
     iw, ih = src_img.size
     dw = max(1, tw // 3)
     dh = max(1, th // 3)
     scale = max(dw / iw, dh / ih)
     dnw = int(iw * scale + 0.5)
     dnh = int(ih * scale + 0.5)
-    
     small = src_img.resize((dnw, dnh), Image.Resampling.BILINEAR)
     left = (dnw - dw) // 2
     top = (dnh - dh) // 2
     cropped = small.crop((left, top, left + dw, top + dh))
     
-    blurred = cropped.filter(ImageFilter.GaussianBlur(radius=8))
+    # Atmospheric monochrome sumi-e ink
+    gray = cropped.convert("L")
+    enhancer = ImageEnhance.Contrast(gray)
+    gray_contrasted = enhancer.enhance(1.25)
+    
+    blurred = gray_contrasted.filter(ImageFilter.GaussianBlur(radius=6))
     full = blurred.resize((tw, th), Image.Resampling.BILINEAR)
-    return full
+    return full.convert("RGBA")
 
 def build_blurred_base(monitors, tw, th, wall_path):
     canvas = Image.new("RGBA", (tw, th), (*BG_COLOR, 255))
@@ -136,17 +122,12 @@ def build_blurred_base(monitors, tw, th, wall_path):
     for m in monitors:
         mw, mh = m["width"], m["height"]
         mx, my = m["x"], m["y"]
-        bg_m = cover_and_blur(src_wall, mw, mh)
+        bg_m = cover_and_sumie(src_wall, mw, mh)
         canvas.paste(bg_m, (mx, my))
 
-    # Roger Deakins Atmospheric Color Grade:
-    # 1. Warm amber/sepia haze wash (Wallace Corp / desert ruin ambient glow)
-    amber_haze = Image.new("RGBA", (tw, th), (*HAZE_TINT, 75))
-    canvas = Image.alpha_composite(canvas, amber_haze)
-
-    # 2. Cinematic deep vignette
-    vignette = Image.new("RGBA", (tw, th), (10, 8, 10, 125))
-    canvas = Image.alpha_composite(canvas, vignette)
+    # Deep sumi ink wash overlay
+    ink_wash = Image.new("RGBA", (tw, th), (14, 13, 15, 140))
+    canvas = Image.alpha_composite(canvas, ink_wash)
 
     base_rgb = canvas.convert("RGB")
     base_rgb.save(BASE_CACHE_IMG, "PNG", compress_level=1)
@@ -188,8 +169,50 @@ def draw_tracked_text(draw, cx, cy, text, font, fill, spacing=6):
         draw.text((cur_x, cy), ch, font=font, fill=fill, anchor="lm")
         cur_x += widths[i] + spacing
 
+def draw_enso_circle(draw, cx, cy, r_base, scale):
+    """Draws an authentic Zen Ensō brush circle framing the 95px i3lock ring."""
+    segments = 120
+    start_angle = -2.4  # radians (~-137 deg)
+    end_angle = 3.3     # radians (~190 deg, leaves Zen open gap)
+    
+    points_outer = []
+    points_inner = []
+    
+    for i in range(segments + 1):
+        t = i / float(segments)
+        angle = start_angle + t * (end_angle - start_angle)
+        
+        # Brush pressure dynamics: swells gracefully and tapers toward tail
+        pressure = math.sin(t * math.pi) ** 1.3
+        thickness = (3.0 + 7.0 * pressure) * scale
+        r_mod = r_base + math.sin(angle * 3.0) * (2.0 * scale)
+        
+        ro = r_mod + (thickness / 2.0)
+        ri = r_mod - (thickness / 2.0)
+        
+        xo = cx + ro * math.cos(angle)
+        yo = cy + ro * math.sin(angle)
+        xi = cx + ri * math.cos(angle)
+        yi = cy + ri * math.sin(angle)
+        
+        points_outer.append((xo, yo))
+        points_inner.append((xi, yi))
+    
+    enso_poly = points_outer + list(reversed(points_inner))
+    draw.polygon(enso_poly, fill=(*WASHI_WHITE, 160))
+
+def draw_hanko_seal(draw, cx, cy, kanji, size):
+    """Draws a traditional Japanese vermilion artist seal (Hanko/Inkan)."""
+    half = size / 2.0
+    x1, y1 = cx - half, cy - half
+    x2, y2 = cx + half, cy + half
+    draw.rounded_rectangle([x1, y1, x2, y2], radius=4, fill=SEAL_FILL, outline=VERMILION_RED, width=2)
+    
+    font_serif_bold = "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc"
+    f_seal = ImageFont.truetype(font_serif_bold, int(size * 0.55))
+    draw.text((cx, cy), kanji, font=f_seal, fill=VERMILION_RED, anchor="mm")
+
 def generate_lock_image():
-    load_theme_colors()
     monitors, tw, th = get_monitors()
     wall_path = get_wallpaper_path()
     
@@ -202,15 +225,14 @@ def generate_lock_image():
     canvas = base_img.copy()
     draw = ImageDraw.Draw(canvas)
 
-    font_bold_path = os.path.expanduser("~/.local/share/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Bold.ttf")
-    font_reg_path = os.path.expanduser("~/.local/share/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Regular.ttf")
+    font_serif_bold = "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc"
+    font_serif_reg = "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc"
+    font_jb_reg = os.path.expanduser("~/.local/share/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Regular.ttf")
 
     now = datetime.now()
     time_raw = now.strftime("%H:%M")
-    # Spaced clock: 1 4 : 4 5
     time_spaced = f"{time_raw[0]} {time_raw[1]} : {time_raw[3]} {time_raw[4]}"
-    date_str = now.strftime("%B %d, %Y  ·  EARTH STANDARD").upper()
-    user_name = os.environ.get("USER", "jimitchavda").upper()
+    date_str = now.strftime("%B %d, %Y").upper()
 
     for m in monitors:
         mw, mh = m["width"], m["height"]
@@ -219,103 +241,97 @@ def generate_lock_image():
         cy = my + (mh // 2)
         scale = mh / 1080.0
         
-        # Proportional typographic scale
-        time_size = int(88 * scale)
+        # Typographic scale
+        time_size = int(86 * scale)
+        kanji_header_size = int(22 * scale)
         date_size = int(14 * scale)
-        badge_size = int(12 * scale)
-        hud_size = int(11 * scale)
-        corner_size = int(10 * scale)
+        quote_size = int(13 * scale)
+        quote_author_size = int(11 * scale)
+        corner_size = int(11 * scale)
+        corner_sub_size = int(10 * scale)
         
         try:
-            f_time = ImageFont.truetype(font_bold_path, time_size)
-            f_date = ImageFont.truetype(font_reg_path, date_size)
-            f_badge = ImageFont.truetype(font_reg_path, badge_size)
-            f_hud = ImageFont.truetype(font_reg_path, hud_size)
-            f_corner = ImageFont.truetype(font_reg_path, corner_size)
+            f_time = ImageFont.truetype(font_serif_bold, time_size)
+            f_kanji_header = ImageFont.truetype(font_serif_bold, kanji_header_size)
+            f_date = ImageFont.truetype(font_jb_reg, date_size)
+            f_quote = ImageFont.truetype(font_serif_reg, quote_size)
+            f_quote_author = ImageFont.truetype(font_serif_bold, quote_author_size)
+            f_corner = ImageFont.truetype(font_serif_reg, corner_size)
+            f_corner_sub = ImageFont.truetype(font_serif_bold, corner_sub_size)
+            f_enso_label = ImageFont.truetype(font_serif_bold, int(11 * scale))
         except Exception:
-            f_time = f_date = f_badge = f_hud = f_corner = ImageFont.load_default()
+            f_time = f_kanji_header = f_date = f_quote = f_quote_author = f_corner = f_corner_sub = f_enso_label = ImageFont.load_default()
         
         # ---------------------------------------------------------------------
-        # 1. Minimalist Blade Runner Reticle around i3lock ring (radius 95px)
+        # 1. Zen Ensō Brush Circle (Framing the 95px i3lock ring)
         # ---------------------------------------------------------------------
-        r_reticle = int(114 * scale)
+        r_enso = int(115 * scale)
+        draw_enso_circle(draw, cx, cy, r_enso, scale)
         
-        # Delicate hairline ring
-        draw.ellipse(
-            [cx - r_reticle, cy - r_reticle, cx + r_reticle, cy + r_reticle],
-            outline=(*AMBER_GOLD, 100),
-            width=1
-        )
-        
-        # Cardinal crosshair tick marks
-        tick_len = int(8 * scale)
-        draw.line([(cx - r_reticle - tick_len, cy), (cx - r_reticle + tick_len, cy)], fill=(*AMBER_GOLD, 180), width=1)
-        draw.line([(cx + r_reticle - tick_len, cy), (cx + r_reticle + tick_len, cy)], fill=(*AMBER_GOLD, 180), width=1)
-        draw.line([(cx, cy - r_reticle - tick_len), (cx, cy - r_reticle + tick_len)], fill=(*AMBER_GOLD, 180), width=1)
-        draw.line([(cx, cy + r_reticle - tick_len), (cx, cy + r_reticle + tick_len)], fill=(*AMBER_GOLD, 180), width=1)
-        
-        # Baseline markers
-        draw_tracked_text(draw, cx, cy - r_reticle - int(16 * scale), "·  B A S E L I N E  ·", f_hud, AMBER_GOLD, spacing=int(4 * scale))
-        draw_tracked_text(draw, cx, cy + r_reticle + int(16 * scale), "I N T E R L I N K E D", f_hud, (*AMBER_GOLD, 160), spacing=int(4 * scale))
+        # Ensō Zen Label (Above & Below the circle)
+        draw_tracked_text(draw, cx, cy - r_enso - int(18 * scale), "無  限", f_enso_label, INK_MUTED, spacing=int(6 * scale))
+        draw_tracked_text(draw, cx, cy + r_enso + int(18 * scale), "円  相", f_enso_label, (*INK_MUTED, 180), spacing=int(6 * scale))
         
         # ---------------------------------------------------------------------
-        # 2. Clock & Date (Above the Reticle with guaranteed clearance)
+        # 2. Clock, Kanji & Date (Above the Ensō with serene spacing)
         # ---------------------------------------------------------------------
-        clock_y = cy - r_reticle - int(165 * scale)
+        clock_y = cy - r_enso - int(170 * scale)
         
-        # Soft ambient warm glow behind clock
-        for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1)]:
-            draw.text((cx + ox, clock_y + oy), time_spaced, font=f_time, fill=(*AMBER_GOLD, 50), anchor="mm")
-        # Crisp ivory core
-        draw.text((cx, clock_y), time_spaced, font=f_time, fill=IVORY_WHITE, anchor="mm")
+        # Subtle calligraphic shadow
+        draw.text((cx + 1, clock_y + 1), time_spaced, font=f_time, fill=(0, 0, 0, 160), anchor="mm")
+        # Crisp Washi White
+        draw.text((cx, clock_y), time_spaced, font=f_time, fill=WASHI_WHITE, anchor="mm")
         
-        # Minimalist hairline divider with center dot
-        div_w = int(140 * scale)
-        div_y = clock_y + int(48 * scale)
-        draw.line([(cx - div_w, div_y), (cx - 10, div_y)], fill=(*AMBER_GOLD, 100), width=1)
-        draw.ellipse([cx - 2, div_y - 2, cx + 2, div_y + 2], fill=AMBER_GOLD)
-        draw.line([(cx + 10, div_y), (cx + div_w, div_y)], fill=(*AMBER_GOLD, 100), width=1)
+        # Kanji Title: 天 下 無 双 ("Invincible Under the Heavens")
+        kanji_y = clock_y + int(52 * scale)
+        draw_tracked_text(draw, cx, kanji_y, "天 下 無 双", f_kanji_header, WASHI_WHITE, spacing=int(14 * scale))
         
-        # Date
-        date_y = div_y + int(18 * scale)
-        draw_tracked_text(draw, cx, date_y, date_str, f_date, (*AMBER_GOLD, 210), spacing=int(2 * scale))
+        # Date & Hanko Seal Row
+        date_y = kanji_y + int(34 * scale)
+        draw_tracked_text(draw, cx - int(24 * scale), date_y, date_str, f_date, INK_MUTED, spacing=int(3 * scale))
         
-        # Replicant / Identity line
-        id_y = date_y + int(32 * scale)
-        id_text = f"NEXUS-9  //  SERIAL: KD6-3.7  ·  {user_name}"
-        draw_tracked_text(draw, cx, id_y, id_text, f_badge, (*MIST_SLATE, 190), spacing=int(2 * scale))
+        # Red Vermilion Hanko Stamp: [ 武蔵 ] (Musashi)
+        hanko_x = cx + int(120 * scale)
+        draw_hanko_seal(draw, hanko_x, date_y, "武蔵", int(26 * scale))
         
         # ---------------------------------------------------------------------
-        # 3. Prompt (Below the Reticle)
+        # 3. Philosophical Inscription (Below the Ensō)
         # ---------------------------------------------------------------------
-        prompt_y = cy + r_reticle + int(54 * scale)
-        prompt_text = "CELLS INTERLINKED  ·  ENTER KEY TO CONFIRM BASELINE"
-        draw_tracked_text(draw, cx, prompt_y, prompt_text, f_hud, (*IVORY_WHITE, 180), spacing=int(3 * scale))
+        quote_y = cy + r_enso + int(56 * scale)
         
-        prompt_sub = ">> [  .  .  .  .  .  .  .  .  ]"
-        draw.text((cx, prompt_y + int(22 * scale)), prompt_sub, font=f_hud, fill=(*AMBER_GOLD, 140), anchor="mm")
+        q1 = "“Preoccupied with a single leaf, you won't see the tree.”"
+        q2 = "“Preoccupied with a single tree, you won't see the entire forest.”"
+        draw.text((cx, quote_y), q1, font=f_quote, fill=WASHI_WHITE, anchor="mm")
+        draw.text((cx, quote_y + int(22 * scale)), q2, font=f_quote, fill=WASHI_WHITE, anchor="mm")
+        
+        author_text = "— 沢庵 宗彭  ·  TAKUAN SŌHŌ  ·  VAGABOND"
+        draw.text((cx, quote_y + int(46 * scale)), author_text, font=f_quote_author, fill=VERMILION_RED, anchor="mm")
+        
+        # Unlock instruction
+        unlock_y = quote_y + int(76 * scale)
+        draw_tracked_text(draw, cx, unlock_y, "心を留めるな  ·  ENTER KEY TO CLEAR THE MIND", f_date, INK_MUTED, spacing=int(2 * scale))
         
         # ---------------------------------------------------------------------
-        # 4. Corner Telemetry (Literary, Philosophical, Wallace Corp)
+        # 4. Corner Telemetry (Classical Japanese Calligraphy & Philosophical Verses)
         # ---------------------------------------------------------------------
-        pad_x = int(46 * scale)
-        pad_y = int(38 * scale)
+        pad_x = int(48 * scale)
+        pad_y = int(40 * scale)
         
-        # Top-Left: Wallace Corp Header
-        draw.text((mx + pad_x, my + pad_y), "WALLACE CORP.  //  MEMORY ARCHIVE", font=f_corner, fill=(*AMBER_GOLD, 190))
-        draw.text((mx + pad_x, my + pad_y + int(16 * scale)), f"SECTOR 04  ·  UNIT: {m['name']}  ·  {mw}x{mh}", font=f_corner, fill=(*MIST_SLATE, 130))
+        # Top-Left: Musashi & The Way of the Sword
+        draw.text((mx + pad_x, my + pad_y), "宮本 武蔵  ·  MIYAMOTO MUSASHI", font=f_corner_sub, fill=WASHI_WHITE)
+        draw.text((mx + pad_x, my + pad_y + int(18 * scale)), "“Invincible is merely a word.”", font=f_corner, fill=INK_MUTED)
         
-        # Top-Right: Baseline Status
-        draw.text((mx + mw - pad_x, my + pad_y), "POST-BLACKOUT RECORD  ·  2049", font=f_corner, fill=(*AMBER_GOLD, 190), anchor="ra")
-        draw.text((mx + mw - pad_x, my + pad_y + int(16 * scale)), "STATUS: CONSTANT", font=f_corner, fill=(*MIST_SLATE, 130), anchor="ra")
+        # Top-Right: Takehiko Inoue Quote
+        draw.text((mx + mw - pad_x, my + pad_y), "“Do you see how infinite you are?”", font=f_corner, fill=WASHI_WHITE, anchor="ra")
+        draw.text((mx + mw - pad_x, my + pad_y + int(18 * scale)), "井上 雄彦  ·  TAKEHIKO INOUE", font=f_corner_sub, fill=INK_FAINT, anchor="ra")
         
-        # Bottom-Left: Iconic Blade Runner Philosophy
-        draw.text((mx + pad_x, my + mh - pad_y - int(16 * scale)), "“All those moments will be lost in time, like tears in rain.”", font=f_corner, fill=(*MIST_SLATE, 120))
-        draw.text((mx + pad_x, my + mh - pad_y), "ROY BATTY  ·  2019  ·  TYRELL ARCHIVES", font=f_corner, fill=(*MUTED_AMBER, 110))
+        # Bottom-Left: The Water Scroll Philosophy
+        draw.text((mx + pad_x, my + mh - pad_y - int(18 * scale)), "“Water obeys only itself. Thoroughly water. Absolutely free.”", font=f_corner, fill=INK_MUTED)
+        draw.text((mx + pad_x, my + mh - pad_y), "五輪書  ·  THE BOOK OF FIVE RINGS", font=f_corner_sub, fill=INK_FAINT)
         
-        # Bottom-Right: Baseline Prompt Echo
-        draw.text((mx + mw - pad_x, my + mh - pad_y - int(16 * scale)), "“A system of cells interlinked within cells...”", font=f_corner, fill=(*MIST_SLATE, 120), anchor="ra")
-        draw.text((mx + mw - pad_x, my + mh - pad_y), "[ AWAITING PASSPHRASE ]", font=f_corner, fill=(*AMBER_GOLD, 170), anchor="ra")
+        # Bottom-Right: Strength and Kindness
+        draw.text((mx + mw - pad_x, my + mh - pad_y - int(18 * scale)), "“All truly strong people are kind.”", font=f_corner, fill=WASHI_WHITE, anchor="ra")
+        draw.text((mx + mw - pad_x, my + mh - pad_y), "浪人  ·  THE PATH OF THE VAGABOND", font=f_corner_sub, fill=VERMILION_RED, anchor="ra")
 
     canvas.save(OUTPUT_LOCK_IMG, "PNG", compress_level=1)
     print(f"BG_HEX={BG_HEX}")
