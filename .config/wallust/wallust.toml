@@ -1,0 +1,35 @@
+# /* ---- 💫 Wallust configuration for i3 & dots ecosystem 💫 ---- */
+# wallust configuration - for wallust version 3.0
+
+backend = "fastresize"
+color_space = "labmixed"
+palette = "dark16"
+threshold = 11
+
+[templates]
+cava.template = 'colors-cava'
+cava.target = '~/.config/cava/config'
+
+rofi.template = 'colors-rofi.rasi'
+rofi.target = '~/.config/rofi/wallust/colors-rofi.rasi'
+
+kitty.template = 'colors-kitty.conf'
+kitty.target = '~/.config/kitty/kitty-themes/01-Wallust.conf'
+
+ghostty.template = 'colors-ghostty.conf'
+ghostty.target = '~/.config/ghostty/wallust.conf'
+
+polybar.template = 'colors-polybar.ini'
+polybar.target = '~/.config/polybar/colors.ini'
+
+i3.template = 'colors-i3.conf'
+i3.target = '~/.config/i3/colors.conf'
+
+dunst.template = 'colors-dunst'
+dunst.target = '~/.config/dunst/dunstrc'
+
+hypr.template = 'colors-hyprland.conf'
+hypr.target = '~/.config/hypr/wallust/wallust-hyprland.conf'
+
+waybar.template = 'colors-waybar.css'
+waybar.target = '~/.config/waybar/wallust/colors-waybar.css'

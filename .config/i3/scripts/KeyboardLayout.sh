@@ -1,0 +1,1 @@
+/home/jimitchavda/.config/i3/scripts/keyboard_layout.sh

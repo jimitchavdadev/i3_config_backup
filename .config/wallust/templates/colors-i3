@@ -1,0 +1,14 @@
+# wallust template - colors-i3
+set $bg {{background}}
+set $fg {{foreground}}
+set $accent {{color4}}
+set $urgent {{color1}}
+set $inactive {{color0}}
+
+# class                 border      bground     text         indicator   child_border
+client.focused          {{color4}}  {{color4}}  {{foreground}} {{color4}}  {{color4}}
+client.focused_inactive {{color0}}  {{color0}}  {{foreground}} {{color0}}  {{color0}}
+client.unfocused        {{background}} {{background}} {{foreground}} {{background}} {{background}}
+client.urgent           {{color1}}  {{color1}}  {{foreground}} {{color1}}  {{color1}}
+client.placeholder      {{background}} {{background}} {{foreground}} {{background}} {{background}}
+client.background       {{background}}
