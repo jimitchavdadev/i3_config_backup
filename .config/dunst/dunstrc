@@ -21,7 +21,7 @@
     horizontal_padding = 16
     text_icon_padding = 12
     frame_width = 2
-    frame_color = "#A97A81"
+    frame_color = "#B68369"
     separator_color = frame
     sort = yes
     idle_threshold = 120
@@ -29,7 +29,7 @@
     font = JetBrainsMono Nerd Font 10
     line_height = 4
     markup = full
-    format = "<b>%s</b>\n%b"
+    format = "<b>%s</b> <span foreground='#FF5555' font='11'>[✕]</span>\n%b"
     alignment = left
     vertical_alignment = center
     show_age_threshold = 60
@@ -54,24 +54,24 @@
     corner_radius = 12
     ignore_dbusclose = false
 
-    mouse_left_click = do_action, close_current
+    mouse_left_click = close_current
     mouse_middle_click = close_current
     mouse_right_click = close_all
 
 [urgency_low]
-    background = "#00000B"
-    foreground = "#F7F7F7"
-    frame_color = "#767B8E"
+    background = "#1A1313"
+    foreground = "#DAF5FD"
+    frame_color = "#B56EA7"
     timeout = 10
 
 [urgency_normal]
-    background = "#00000B"
-    foreground = "#F7F7F7"
-    frame_color = "#A97A81"
+    background = "#1A1313"
+    foreground = "#DAF5FD"
+    frame_color = "#B68369"
     timeout = 10
 
 [urgency_critical]
-    background = "#00000B"
-    foreground = "#F7F7F7"
-    frame_color = "#707181"
+    background = "#1A1313"
+    foreground = "#DAF5FD"
+    frame_color = "#108FB8"
     timeout = 0

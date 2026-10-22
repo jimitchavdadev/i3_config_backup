@@ -48,11 +48,22 @@ fi
 # -f: show failed attempt counter
 # -n: nofork (clean integration with systemd/xss-lock)
 # -u: --no-unlock-indicator (makes the middle circle completely black/invisible when clicked or typed)
+# -d: debug mode (emits 'Authentication failure' on PAM wrong password)
 if [ -f "$OUTPUT_LOCK_IMG" ]; then
-    i3lock -c "${BG_HEX:-0F0E10}" -i "$OUTPUT_LOCK_IMG" -e -f -n -u
+    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -i "$OUTPUT_LOCK_IMG" -e -f -n -u -d)
 else
-    i3lock -c "${BG_HEX:-0F0E10}" -e -f -n -u
+    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -e -f -n -u -d)
 fi
+
+# Run i3lock and monitor for Authentication failure in real-time
+while IFS= read -r line; do
+    if [[ "$line" == *"Authentication failure"* ]]; then
+        if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
+            echo "WRONG" >&"${FADER[1]}" 2>/dev/null || true
+            kill -USR2 "$FADER_PID" 2>/dev/null || true
+        fi
+    fi
+done < <(i3lock "${LOCK_ARGS[@]}" 2>&1)
 
 # On successful password entry (i3lock exits cleanly):
 # Trigger the magical disappearing animation to smoothly dissolve into the desktop
