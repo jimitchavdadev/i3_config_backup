@@ -173,29 +173,43 @@ class TinySlash:
                     cr.arc(dx, dy, d["r"], 0, 2 * math.pi)
                     cr.fill()
 
-class RedBlastingEye:
-    """The Red Blasting Demon Eye that awakens and blasts in the center upon incorrect password."""
-    def __init__(self, cx, cy, scale):
+class DemonEyeEffect:
+    """The anime Demonic Eye that awakens strictly inside the white Ensō circle upon wrong password."""
+    def __init__(self, cx, cy, scale, eye_pixbuf):
         self.cx = cx
         self.cy = cy
         self.scale = scale
+        self.eye_pixbuf = eye_pixbuf
         self.start_time = time.time()
-        self.duration = 1.15  # 1.15s dramatic blast & glare
+        self.duration = 1.45
+        self.r_enso = 115.0 * scale
 
-        # 36 radial blast particles / sparks
-        self.particles = []
-        for _ in range(36):
+        # Pupil center in 1024x576 source is at (516, 259)
+        if self.eye_pixbuf:
+            pb_w = self.eye_pixbuf.get_width()
+            pb_h = self.eye_pixbuf.get_height()
+            self.draw_x = cx - (516.0 / 1024.0) * pb_w
+            self.draw_y = cy - (259.0 / 576.0) * pb_h
+        else:
+            self.draw_x = cx - int(300 * scale)
+            self.draw_y = cy - int(169 * scale)
+
+        # 20 embers drifting inside the circle
+        self.embers = []
+        for _ in range(20):
             angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(70.0, 165.0) * scale
-            r = random.uniform(2.2, 5.0) * scale
-            self.particles.append((angle, speed, r))
-
-        # Vein branches
-        self.veins = []
-        for _ in range(8):
-            angle = random.uniform(-0.6, 0.6) if random.random() < 0.5 else random.uniform(2.5, 3.7)
-            length = random.uniform(30.0, 65.0) * scale
-            self.veins.append((angle, length))
+            dist = random.uniform(10.0, 95.0) * scale
+            r = random.uniform(1.8, 4.5) * scale
+            speed = random.uniform(10.0, 28.0) * scale
+            max_a = random.uniform(0.40, 0.85)
+            self.embers.append({
+                "x": cx + dist * math.cos(angle),
+                "y": cy + dist * math.sin(angle),
+                "vx": math.cos(angle) * speed * 0.4,
+                "vy": -abs(math.sin(angle) * speed) - random.uniform(5.0, 15.0),
+                "r": r,
+                "max_a": max_a
+            })
 
     def is_alive(self, now):
         return (now - self.start_time) < self.duration
@@ -204,133 +218,76 @@ class RedBlastingEye:
         elapsed = now - self.start_time
         t = min(1.0, elapsed / self.duration)
 
-        # Eye snap open curve
-        open_ratio = min(1.0, (t / 0.12) ** 1.6)
-
-        # Dissolve fade curve
-        if t < 0.45:
-            fade_a = 1.0
-        else:
-            fade_a = max(0.0, float((1.0 - (t - 0.45) / 0.55) ** 1.6))
-
-        # Camera tremor / screen shake during blast (first 0.15s)
-        if t < 0.15:
-            shake_y = (1.0 - t / 0.15) * 5.0 * math.sin(t * 110)
-            shake_x = (1.0 - t / 0.15) * 3.0 * math.cos(t * 90)
+        # 1. Screen tremor / shake during initial awakening
+        if t < 0.16:
+            decay = (1.0 - t / 0.16)
+            shake_x = decay * 5.0 * math.sin(t * 115)
+            shake_y = decay * 3.5 * math.cos(t * 90)
         else:
             shake_x, shake_y = 0.0, 0.0
+
+        # Alpha curve: instant snap-on, sustains, dissolves into mist
+        if t < 0.85:
+            fade_a = 1.0
+        else:
+            fade_a = max(0.0, float((1.0 - (t - 0.85) / 0.60) ** 1.5))
 
         cx = self.cx + shake_x
         cy = self.cy + shake_y
         scale = self.scale
+        r_enso = self.r_enso
 
-        eye_w = 88.0 * scale
-        eye_h = 50.0 * scale * open_ratio
+        if fade_a <= 0.01:
+            return
 
-        # -------------------------------------------------------------
-        # 1. Outer Crimson Ambient Aura
-        # -------------------------------------------------------------
-        cr.set_source_rgba(0.92, 0.06, 0.06, 0.38 * fade_a)
-        cr.arc(cx, cy, eye_w * 1.35, 0, 2 * math.pi)
-        cr.fill()
+        # 2. Clip strictly inside the white Ensō circle!
+        cr.save()
+        cr.arc(cx, cy, r_enso - 1.0 * scale, 0, 2 * math.pi)
+        cr.clip()
 
-        # -------------------------------------------------------------
-        # 2. Almond Eyelid Contour & Dark Sclera
-        # -------------------------------------------------------------
-        cr.move_to(cx - eye_w, cy)
-        cr.curve_to(cx - eye_w * 0.5, cy - eye_h * 1.25, cx + eye_w * 0.5, cy - eye_h * 1.25, cx + eye_w, cy)
-        cr.curve_to(cx + eye_w * 0.5, cy + eye_h * 1.25, cx - eye_w * 0.5, cy + eye_h * 1.25, cx - eye_w, cy)
-        cr.close_path()
+        # Pure deep ink black base inside the circle (no purple background)
+        cr.set_source_rgba(0.03, 0.02, 0.03, fade_a)
+        cr.paint()
 
-        # Deep demonic blood sclera
-        cr.set_source_rgba(0.24, 0.02, 0.02, 0.95 * fade_a)
-        cr.fill_preserve()
+        # 3. Render Demon Eye Pixbuf (inside circle only)
+        if self.eye_pixbuf:
+            Gdk.cairo_set_source_pixbuf(cr, self.eye_pixbuf, self.draw_x + shake_x, self.draw_y + shake_y)
+            cr.paint_with_alpha(fade_a)
 
-        # Fiery vermilion eyelid stroke
-        cr.set_source_rgba(0.95, 0.12, 0.08, 0.95 * fade_a)
-        cr.set_line_width(3.4 * scale)
-        cr.stroke()
-
-        # -------------------------------------------------------------
-        # 3. Pulsating Blood Veins
-        # -------------------------------------------------------------
-        cr.set_line_width(1.6 * scale)
-        cr.set_source_rgba(0.85, 0.08, 0.08, 0.75 * fade_a)
-        for ang, length in self.veins:
-            x0 = cx + math.cos(ang) * (eye_w * 0.75)
-            y0 = cy + math.sin(ang) * (eye_h * 0.4)
-            x1 = x0 + math.cos(ang) * length
-            y1 = y0 + math.sin(ang) * (length * 0.5)
-            cr.move_to(x0, y0)
-            cr.line_to(x1, y1)
-        cr.stroke()
-
-        # -------------------------------------------------------------
-        # 4. Glowing Iris
-        # -------------------------------------------------------------
-        iris_r = 25.0 * scale * open_ratio
-        cr.set_source_rgba(0.96, 0.10, 0.06, 0.96 * fade_a)
+        # 4. Concentric Glowing Iris Heartbeat Pulse
+        pulse = 1.0 + 0.18 * math.sin(elapsed * 16.0)
+        iris_r = 75.0 * scale * pulse
+        rad = cairo.RadialGradient(cx, cy, 3.0, cx, cy, iris_r)
+        rad.add_color_stop_rgba(0.0, 1.0, 0.28, 0.16, 0.65 * fade_a)
+        rad.add_color_stop_rgba(0.4, 0.95, 0.08, 0.05, 0.30 * fade_a)
+        rad.add_color_stop_rgba(1.0, 0.80, 0.02, 0.02, 0.0)
+        cr.set_source(rad)
         cr.arc(cx, cy, iris_r, 0, 2 * math.pi)
         cr.fill()
 
-        # Inner Iris Ring
-        cr.set_source_rgba(1.0, 0.38, 0.10, 0.92 * fade_a)
-        cr.set_line_width(2.0 * scale)
-        cr.arc(cx, cy, iris_r * 0.65, 0, 2 * math.pi)
-        cr.stroke()
+        # 5. Floating embers inside the circle
+        for emb in self.embers:
+            cur_x = emb["x"] + emb["vx"] * elapsed + shake_x
+            cur_y = emb["y"] + emb["vy"] * elapsed + shake_y
+            cur_a = emb["max_a"] * fade_a
 
-        # -------------------------------------------------------------
-        # 5. Demonic Vertical Slit Pupil
-        # -------------------------------------------------------------
+            rad_e = cairo.RadialGradient(cur_x, cur_y, 0, cur_x, cur_y, emb["r"])
+            rad_e.add_color_stop_rgba(0.0, 1.0, 0.35, 0.20, cur_a)
+            rad_e.add_color_stop_rgba(0.5, 0.95, 0.12, 0.08, cur_a * 0.70)
+            rad_e.add_color_stop_rgba(1.0, 0.85, 0.05, 0.05, 0.0)
+            cr.set_source(rad_e)
+            cr.arc(cur_x, cur_y, emb["r"], 0, 2 * math.pi)
+            cr.fill()
+
+        cr.restore() # Unclip
+
+        # 6. Re-stroke the crisp White Ensō Brush Circle border on top
         cr.save()
-        cr.translate(cx, cy)
-        cr.scale(1.0, 3.8)
-        cr.set_source_rgba(0.02, 0.01, 0.02, 1.0 * fade_a)
-        cr.arc(0, 0, 4.2 * scale * open_ratio, 0, 2 * math.pi)
-        cr.fill()
+        cr.set_source_rgba(0.96, 0.96, 0.95, 0.88 * fade_a)
+        cr.set_line_width(4.5 * scale)
+        cr.arc(cx, cy, r_enso, 0, 2 * math.pi)
+        cr.stroke()
         cr.restore()
-
-        # Eye specular glint
-        cr.set_source_rgba(1.0, 0.96, 0.96, 0.95 * fade_a)
-        cr.arc(cx - 5.0 * scale, cy - 6.0 * scale, 2.5 * scale, 0, 2 * math.pi)
-        cr.fill()
-
-        # -------------------------------------------------------------
-        # 6. Energy Blast Shockwave Rings
-        # -------------------------------------------------------------
-        if t > 0.06:
-            sw_prog1 = (t - 0.06) / 0.42
-            if sw_prog1 < 1.0:
-                sw_r1 = sw_prog1 * 140.0 * scale
-                sw_a1 = (1.0 - sw_prog1) * fade_a
-                cr.set_source_rgba(1.0, 0.16, 0.10, sw_a1 * 0.85)
-                cr.set_line_width(2.8 * scale)
-                cr.arc(cx, cy, sw_r1, 0, 2 * math.pi)
-                cr.stroke()
-
-        if t > 0.12:
-            sw_prog2 = (t - 0.12) / 0.45
-            if sw_prog2 < 1.0:
-                sw_r2 = sw_prog2 * 115.0 * scale
-                sw_a2 = (1.0 - sw_prog2) * fade_a
-                cr.set_source_rgba(0.92, 0.08, 0.08, sw_a2 * 0.70)
-                cr.set_line_width(2.0 * scale)
-                cr.arc(cx, cy, sw_r2, 0, 2 * math.pi)
-                cr.stroke()
-
-        # -------------------------------------------------------------
-        # 7. Radial Blast Sparks & Blood Particles
-        # -------------------------------------------------------------
-        if t > 0.05:
-            p_prog = min(1.0, (t - 0.05) / 0.48)
-            p_alpha = (1.0 - p_prog) * fade_a
-            for ang, spd, pr in self.particles:
-                dist = p_prog * spd
-                px = cx + math.cos(ang) * dist
-                py = cy + math.sin(ang) * dist
-                cr.set_source_rgba(1.0, 0.18, 0.08, p_alpha * 0.92)
-                cr.arc(px, py, pr, 0, 2 * math.pi)
-                cr.fill()
 
 class BloodKatanaFader:
     def __init__(self, img_path, duration=0.72):
@@ -354,18 +311,33 @@ class BloodKatanaFader:
             except Exception as e:
                 sys.stderr.write(f"Failed to prepare background: {e}\n")
 
-        # Setup monitors and trajectories
+        # Setup monitors, trajectories, and Demon Eye assets
         self.monitors = get_monitors()
         self.slashes = []
         self.tiny_slashes = []
         self.wrong_eyes = []
-        random.seed(1584)  # Musashi birth year for deterministic final blood splatters
+        self.keys_typed = 0
+        self.has_typed = False
+        self.pending_auth_timer = None
+        random.seed(1584)
+
+        EYE_IMG_PATH = "/home/jimitchavda/.config/i3/assets/demon_eye_pure.png"
 
         for m in self.monitors:
             mx, my, mw, mh = m["x"], m["y"], m["w"], m["h"]
             cx = mx + (mw // 2)
             cy = my + (mh // 2)
             scale = mh / 1080.0
+
+            # Pre-load demon eye pixbuf scaled for this monitor
+            eye_pb = None
+            if os.path.isfile(EYE_IMG_PATH):
+                try:
+                    target_w = int(600 * scale)
+                    target_h = int(338 * scale)
+                    eye_pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(EYE_IMG_PATH, target_w, target_h, True)
+                except Exception as e:
+                    sys.stderr.write(f"Failed to load demon eye asset: {e}\n")
 
             p0 = (cx - mw * 0.44, cy - mh * 0.34)
             p1 = (cx + mw * 0.44, cy + mh * 0.34)
@@ -392,7 +364,8 @@ class BloodKatanaFader:
                 "p1": p1,
                 "pctrl": pctrl,
                 "scale": scale,
-                "particles": particles
+                "particles": particles,
+                "eye_pb": eye_pb
             })
 
         # Override-redirect POPUP window covering all monitors
@@ -427,7 +400,7 @@ class BloodKatanaFader:
             except Exception:
                 pass
 
-        # IPC Triggers (stdin and signals)
+        # Watch stdin without buffered TextIOWrapper issues
         GLib.io_add_watch(sys.stdin.fileno(), GLib.IO_IN, self.on_stdin)
         signal.signal(signal.SIGUSR1, self.on_sig_disappear)
         signal.signal(signal.SIGUSR2, self.on_sig_wrong)
@@ -442,22 +415,44 @@ class BloodKatanaFader:
         sys.stdout.flush()
 
     def on_key_event(self, source, condition, fd):
-        """Reads raw keyboard events from evdev to trigger tiny slashes on each keystroke."""
+        """Reads raw keyboard events from evdev to trigger tiny slashes and track auth attempts."""
         try:
             data = os.read(fd, 24 * 16)
             while len(data) >= 24:
                 sec, usec, ev_type, code, val = struct.unpack('qqHHi', data[:24])
                 data = data[24:]
                 if ev_type == 1 and val == 1:
-                    # Clear wrong eye once user starts typing again
+                    # Clear demon eye immediately once user starts typing next attempt
                     if self.wrong_eyes:
                         self.wrong_eyes.clear()
-                    if code not in (28, 96):
-                        is_bksp = (code == 14)
-                        self.trigger_keystroke_slash(is_bksp)
+                        self.window.queue_draw()
+
+                    if code in (28, 96):  # ENTER or KP_ENTER
+                        if self.keys_typed > 0 or self.has_typed:
+                            self.keys_typed = 0
+                            self.has_typed = False
+                            # Start fallback timer: if PAM does not unlock within 450ms, it's incorrect
+                            if self.pending_auth_timer is not None:
+                                GLib.source_remove(self.pending_auth_timer)
+                            self.pending_auth_timer = GLib.timeout_add(450, self.on_auth_timeout)
+                    elif code == 14:  # BACKSPACE
+                        self.keys_typed = max(0, self.keys_typed - 1)
+                        self.trigger_keystroke_slash(is_backspace=True)
+                    elif code in (42, 54, 29, 97, 56, 100, 125, 126):  # Modifiers (Shift, Ctrl, Alt, Super)
+                        pass
+                    else:  # Normal keystroke
+                        self.keys_typed += 1
+                        self.has_typed = True
+                        self.trigger_keystroke_slash(is_backspace=False)
         except Exception:
             pass
         return True
+
+    def on_auth_timeout(self):
+        """Fallback timer: Enter was pressed but no unlock occurred -> wrong password!"""
+        self.pending_auth_timer = None
+        self.trigger_wrong_password_eye()
+        return False
 
     def trigger_keystroke_slash(self, is_backspace=False):
         """Spawns a tiny blood slash inside each monitor's Ensō circle."""
@@ -474,16 +469,21 @@ class BloodKatanaFader:
         self.window.queue_draw()
 
     def trigger_wrong_password_eye(self):
-        """Spawns the Red Blasting Demon Eye in the center on wrong password."""
+        """Spawns the Demonic Eye in the center on wrong password."""
         if self.final_animating:
             return
+
+        if self.pending_auth_timer is not None:
+            GLib.source_remove(self.pending_auth_timer)
+            self.pending_auth_timer = None
 
         self.tiny_slashes.clear()
         self.wrong_eyes.clear()
 
         for slash in self.slashes:
             cx, cy, scale = slash["cx"], slash["cy"], slash["scale"]
-            self.wrong_eyes.append(RedBlastingEye(cx, cy, scale))
+            eye_pb = slash.get("eye_pb")
+            self.wrong_eyes.append(DemonEyeEffect(cx, cy, scale, eye_pb))
 
         if self.tick_timer_id is None:
             self.tick_timer_id = GLib.timeout_add(16, self.on_tick)
@@ -614,9 +614,10 @@ class BloodKatanaFader:
         return True
 
     def on_stdin(self, fd, condition):
+        """Reads raw bytes from stdin without libc buffering."""
         try:
-            line = sys.stdin.readline()
-            if line:
+            raw = os.read(fd, 1024).decode('utf-8', errors='ignore')
+            for line in raw.splitlines():
                 cmd = line.strip()
                 if cmd == "WRONG":
                     self.trigger_wrong_password_eye()
@@ -642,6 +643,9 @@ class BloodKatanaFader:
         return False
 
     def cleanup_fds(self):
+        if self.pending_auth_timer is not None:
+            GLib.source_remove(self.pending_auth_timer)
+            self.pending_auth_timer = None
         for fd in self.kbd_fds:
             try:
                 os.close(fd)

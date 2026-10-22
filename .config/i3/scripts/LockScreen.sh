@@ -55,15 +55,15 @@ else
     LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -e -f -n -u -d)
 fi
 
-# Run i3lock and monitor for Authentication failure in real-time
+# Run i3lock with unbuffered pipes and monitor for Authentication failure in real-time
 while IFS= read -r line; do
-    if [[ "$line" == *"Authentication failure"* ]]; then
+    if [[ "$line" == *"Authentication failure"* ]] || [[ "$line" == *"Wrong"* ]] || [[ "$line" == *"clearing auth wrong"* ]]; then
         if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
             echo "WRONG" >&"${FADER[1]}" 2>/dev/null || true
             kill -USR2 "$FADER_PID" 2>/dev/null || true
         fi
     fi
-done < <(i3lock "${LOCK_ARGS[@]}" 2>&1)
+done < <(stdbuf -i0 -o0 -e0 i3lock "${LOCK_ARGS[@]}" 2>&1)
 
 # On successful password entry (i3lock exits cleanly):
 # Trigger the magical disappearing animation to smoothly dissolve into the desktop
