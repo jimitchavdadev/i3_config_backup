@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-Aesthetic Multi-Monitor Lock Screen Generator for i3
-Dynamically adapts to all connected monitors, scales/crops wallpaper
-with aspect-fill, applies smooth glassmorphism blur, and composites
-a modern Hyprlock-inspired clock, date, and user pill.
+Cyberpunk Multi-Monitor Lock Screen Generator for i3
+Renders high-tech HUD elements, digital neon glow clock, chamfered user badge,
+reticle targeting frame around i3lock indicator, scanlines, and corner telemetry.
 """
 
 import os
 import re
 import sys
-import time
 import subprocess
 from datetime import datetime
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -18,13 +16,14 @@ BASE_CACHE_IMG = "/tmp/i3lock_blurred_base.png"
 BASE_CACHE_META = "/tmp/i3lock_base.meta"
 OUTPUT_LOCK_IMG = "/tmp/i3lock_aesthetic.png"
 
-# Default theme colors (Wallust / Catppuccin inspired)
+# Cyberpunk Theme Colors
 BG_HEX = "1A1313"
-BG_COLOR = (26, 19, 19)
+BG_COLOR = (22, 17, 24)
 FG_COLOR = (218, 245, 253)
-PRIMARY_COLOR = (182, 131, 105)
-SECONDARY_COLOR = (112, 170, 188)
-MUTED_COLOR = (136, 163, 171)
+NEON_CYAN = (21, 191, 245)
+NEON_PINK = (242, 146, 223)
+NEON_AMBER = (246, 178, 105)
+MUTED_TEXT = (112, 170, 188)
 
 def hex_to_rgb(h):
     h = h.strip().lstrip("#")
@@ -33,7 +32,7 @@ def hex_to_rgb(h):
     return None
 
 def load_theme_colors():
-    global BG_HEX, BG_COLOR, FG_COLOR, PRIMARY_COLOR, SECONDARY_COLOR, MUTED_COLOR
+    global BG_HEX, BG_COLOR, FG_COLOR, NEON_CYAN, NEON_PINK, NEON_AMBER, MUTED_TEXT
     colors_file = os.path.expanduser("~/.config/polybar/colors.ini")
     if os.path.isfile(colors_file):
         try:
@@ -49,15 +48,18 @@ def load_theme_colors():
                     elif line.startswith("foreground ="):
                         c = hex_to_rgb(line.split("=")[1])
                         if c: FG_COLOR = c
-                    elif line.startswith("primary ="):
+                    elif line.startswith("color9 =") or line.startswith("color14 ="):
                         c = hex_to_rgb(line.split("=")[1])
-                        if c: PRIMARY_COLOR = c
+                        if c: NEON_CYAN = c
+                    elif line.startswith("color10 ="):
+                        c = hex_to_rgb(line.split("=")[1])
+                        if c: NEON_PINK = c
+                    elif line.startswith("color13 =") or line.startswith("color11 ="):
+                        c = hex_to_rgb(line.split("=")[1])
+                        if c: NEON_AMBER = c
                     elif line.startswith("secondary ="):
                         c = hex_to_rgb(line.split("=")[1])
-                        if c: SECONDARY_COLOR = c
-                    elif line.startswith("disabled ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: MUTED_COLOR = c
+                        if c: MUTED_TEXT = c
         except Exception:
             pass
 
@@ -109,7 +111,6 @@ def get_wallpaper_path():
     return None
 
 def cover_and_blur(src_img, tw, th):
-    """Aspect fill (cover) crop and smooth Gaussian blur."""
     iw, ih = src_img.size
     dw = max(1, tw // 3)
     dh = max(1, th // 3)
@@ -142,10 +143,17 @@ def build_blurred_base(monitors, tw, th, wall_path):
         bg_m = cover_and_blur(src_wall, mw, mh)
         canvas.paste(bg_m, (mx, my))
 
-    # Apply elegant dark overlay for contrast & readability
-    overlay = Image.new("RGBA", (tw, th), (0, 0, 0, 105))
+    # Dark cyber vignette overlay
+    overlay = Image.new("RGBA", (tw, th), (8, 6, 12, 135))
     canvas = Image.alpha_composite(canvas, overlay)
-    
+
+    # Subtle horizontal cyber scanlines
+    scanlines = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    sdraw = ImageDraw.Draw(scanlines)
+    for y in range(0, th, 4):
+        sdraw.line([(0, y), (tw, y)], fill=(0, 0, 0, 35))
+    canvas = Image.alpha_composite(canvas, scanlines)
+
     base_rgb = canvas.convert("RGB")
     base_rgb.save(BASE_CACHE_IMG, "PNG", compress_level=1)
     
@@ -194,8 +202,8 @@ def generate_lock_image():
 
     now = datetime.now()
     time_str = now.strftime("%H:%M")
-    date_str = now.strftime("%A, %d %B")
-    user_name = os.environ.get("USER", "jimitchavda")
+    date_str = now.strftime("%A // %d %B %Y").upper()
+    user_name = os.environ.get("USER", "jimitchavda").upper()
 
     for m in monitors:
         mw, mh = m["width"], m["height"]
@@ -204,69 +212,151 @@ def generate_lock_image():
         cy = my + (mh // 2)
         scale = mh / 1080.0
         
-        time_size = int(82 * scale)
-        date_size = int(22 * scale)
-        sub_size = int(14 * scale)
-        badge_size = int(14 * scale)
+        # Scale fonts
+        time_size = int(90 * scale)
+        date_size = int(17 * scale)
+        badge_size = int(13 * scale)
+        hud_size = int(12 * scale)
+        corner_size = int(11 * scale)
         
         try:
             f_time = ImageFont.truetype(font_bold_path, time_size)
             f_date = ImageFont.truetype(font_reg_path, date_size)
-            f_sub = ImageFont.truetype(font_reg_path, sub_size)
             f_badge = ImageFont.truetype(font_bold_path, badge_size)
+            f_hud = ImageFont.truetype(font_bold_path, hud_size)
+            f_corner = ImageFont.truetype(font_reg_path, corner_size)
         except Exception:
-            f_time = f_date = f_sub = f_badge = ImageFont.load_default()
+            f_time = f_date = f_badge = f_hud = f_corner = ImageFont.load_default()
         
-        # Clock
-        tb = draw.textbbox((0, 0), time_str, font=f_time)
-        tw_text = tb[2] - tb[0]
-        th_text = tb[3] - tb[1]
-        time_y = cy - int(245 * scale)
-        time_x = cx - (tw_text // 2)
-        draw.text((time_x, time_y), time_str, font=f_time, fill=FG_COLOR)
+        # ---------------------------------------------------------------------
+        # 1. Central Cyberpunk HUD Reticle around i3lock ring
+        # ---------------------------------------------------------------------
+        r_hud = int(118 * scale)
+        bracket_len = int(24 * scale)
+        
+        # Glowing Corner Tech Brackets
+        draw.line([(cx - r_hud, cy - r_hud + bracket_len), (cx - r_hud, cy - r_hud), (cx - r_hud + bracket_len, cy - r_hud)], fill=NEON_CYAN, width=2)
+        draw.line([(cx + r_hud - bracket_len, cy - r_hud), (cx + r_hud, cy - r_hud), (cx + r_hud, cy - r_hud + bracket_len)], fill=NEON_CYAN, width=2)
+        draw.line([(cx - r_hud, cy + r_hud - bracket_len), (cx - r_hud, cy + r_hud), (cx - r_hud + bracket_len, cy + r_hud)], fill=NEON_CYAN, width=2)
+        draw.line([(cx + r_hud - bracket_len, cy + r_hud), (cx + r_hud, cy + r_hud), (cx + r_hud, cy + r_hud - bracket_len)], fill=NEON_CYAN, width=2)
+        
+        # Concentric HUD arcs (Neon Pink)
+        arc_inset = int(10 * scale)
+        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=30, end=60, fill=NEON_PINK, width=2)
+        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=120, end=150, fill=NEON_PINK, width=2)
+        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=210, end=240, fill=NEON_PINK, width=2)
+        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=300, end=330, fill=NEON_PINK, width=2)
+        
+        # Crosshair alignment ticks
+        tick_in = r_hud + int(6 * scale)
+        tick_out = r_hud + int(16 * scale)
+        draw.line([(cx - tick_out, cy), (cx - tick_in, cy)], fill=NEON_CYAN, width=1)
+        draw.line([(cx + tick_in, cy), (cx + tick_out, cy)], fill=NEON_CYAN, width=1)
+        draw.line([(cx, cy - tick_out), (cx, cy - tick_in)], fill=NEON_CYAN, width=1)
+        draw.line([(cx, cy + tick_in), (cx, cy + tick_out)], fill=NEON_CYAN, width=1)
+        
+        # Reticle Top Tag
+        reticle_tag = "[ BIOMETRIC // LOCK ]"
+        draw.text((cx, cy - r_hud - int(12 * scale)), reticle_tag, font=f_hud, fill=NEON_PINK, anchor="ms")
+        
+        # ---------------------------------------------------------------------
+        # 2. Clock & Date (Above Reticle with guaranteed clearance)
+        # ---------------------------------------------------------------------
+        clock_y = cy - r_hud - int(160 * scale)
+        
+        # Neon Glow pass for Clock
+        for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1)]:
+            draw.text((cx + ox, clock_y + oy), time_str, font=f_time, fill=(*NEON_CYAN, 70), anchor="mm")
+        # Crisp core
+        draw.text((cx, clock_y), time_str, font=f_time, fill=FG_COLOR, anchor="mm")
+        
+        # Tech divider line with center diamond
+        div_w = int(170 * scale)
+        div_y = clock_y + int(48 * scale)
+        draw.line([(cx - div_w, div_y), (cx - 16, div_y)], fill=(*NEON_CYAN, 160), width=1)
+        draw.polygon([(cx - 5, div_y), (cx, div_y - 4), (cx + 5, div_y), (cx, div_y + 4)], fill=NEON_PINK)
+        draw.line([(cx + 16, div_y), (cx + div_w, div_y)], fill=(*NEON_CYAN, 160), width=1)
         
         # Date
-        db = draw.textbbox((0, 0), date_str, font=f_date)
-        dw_text = db[2] - db[0]
-        date_y = time_y + th_text + int(14 * scale)
-        date_x = cx - (dw_text // 2)
-        draw.text((date_x, date_y), date_str, font=f_date, fill=SECONDARY_COLOR)
+        date_y = div_y + int(18 * scale)
+        draw.text((cx, date_y), date_str, font=f_date, fill=NEON_CYAN, anchor="mm")
         
-        # User Pill Badge
-        badge_text = f"  {user_name}"
+        # ---------------------------------------------------------------------
+        # 3. Chamfered Sci-Fi User Badge
+        # ---------------------------------------------------------------------
+        badge_y = date_y + int(38 * scale)
+        badge_text = f"// USER: {user_name} // NODE: 0x7F //"
         bb = draw.textbbox((0, 0), badge_text, font=f_badge)
-        bw_text = bb[2] - bb[0]
-        bh_text = bb[3] - bb[1]
-        pill_pad_x = int(18 * scale)
-        pill_pad_y = int(8 * scale)
-        pill_w = bw_text + (pill_pad_x * 2)
-        pill_h = bh_text + (pill_pad_y * 2)
-        pill_x1 = cx - (pill_w // 2)
-        pill_y1 = date_y + int(38 * scale)
-        pill_x2 = pill_x1 + pill_w
-        pill_y2 = pill_y1 + pill_h
+        bw = bb[2] - bb[0]
+        bh = bb[3] - bb[1]
         
-        draw.rounded_rectangle(
-            [pill_x1, pill_y1, pill_x2, pill_y2],
-            radius=int(14 * scale),
-            fill=BG_COLOR,
-            outline=PRIMARY_COLOR,
-            width=1
-        )
-        badge_x = cx - (bw_text // 2)
-        badge_y = pill_y1 + pill_pad_y - 1
-        draw.text((badge_x, badge_y), badge_text, font=f_badge, fill=FG_COLOR)
+        pw = bw + int(32 * scale)
+        ph = bh + int(14 * scale)
+        px1 = cx - (pw // 2)
+        py1 = badge_y - (ph // 2)
+        px2 = px1 + pw
+        py2 = py1 + ph
+        chamfer = int(6 * scale)
         
-        # Unlock instruction placed cleanly below i3lock's 190px ring (center is cy)
-        sub_text = "󰌾  Type password to unlock"
-        sb = draw.textbbox((0, 0), sub_text, font=f_sub)
-        sw_text = sb[2] - sb[0]
-        sub_y = cy + int(125 * scale)
-        sub_x = cx - (sw_text // 2)
-        draw.text((sub_x, sub_y), sub_text, font=f_sub, fill=MUTED_COLOR)
+        badge_poly = [
+            (px1 + chamfer, py1),
+            (px2 - chamfer, py1),
+            (px2, py1 + chamfer),
+            (px2, py2 - chamfer),
+            (px2 - chamfer, py2),
+            (px1 + chamfer, py2),
+            (px1, py2 - chamfer),
+            (px1, py1 + chamfer)
+        ]
+        draw.polygon(badge_poly, fill=(24, 18, 28, 220), outline=NEON_PINK)
+        draw.text((cx, badge_y), badge_text, font=f_badge, fill=FG_COLOR, anchor="mm")
+        
+        # ---------------------------------------------------------------------
+        # 4. Input Command Prompt (Below Reticle with guaranteed clearance)
+        # ---------------------------------------------------------------------
+        prompt_y = cy + r_hud + int(36 * scale)
+        prompt_w = int(320 * scale)
+        prompt_h = int(34 * scale)
+        pr_x1 = cx - (prompt_w // 2)
+        pr_y1 = prompt_y
+        pr_x2 = pr_x1 + prompt_w
+        pr_y2 = pr_y1 + prompt_h
+        
+        # Cyber bracket container
+        draw.line([(pr_x1, pr_y1), (pr_x1 + 12, pr_y1)], fill=NEON_CYAN, width=1)
+        draw.line([(pr_x1, pr_y1), (pr_x1, pr_y2)], fill=NEON_CYAN, width=1)
+        draw.line([(pr_x1, pr_y2), (pr_x1 + 12, pr_y2)], fill=NEON_CYAN, width=1)
+        
+        draw.line([(pr_x2 - 12, pr_y1), (pr_x2, pr_y1)], fill=NEON_CYAN, width=1)
+        draw.line([(pr_x2, pr_y1), (pr_x2, pr_y2)], fill=NEON_CYAN, width=1)
+        draw.line([(pr_x2 - 12, pr_y2), (pr_x2, pr_y2)], fill=NEON_CYAN, width=1)
+        
+        prompt_text = ">> ENTER ACCESS CIPHER [ _ ]"
+        draw.text((cx, prompt_y + (prompt_h // 2)), prompt_text, font=f_hud, fill=NEON_AMBER, anchor="mm")
+        
+        # ---------------------------------------------------------------------
+        # 5. Screen Corner HUD Telemetry
+        # ---------------------------------------------------------------------
+        pad_x = int(38 * scale)
+        pad_y = int(32 * scale)
+        
+        # Top-Left
+        draw.text((mx + pad_x, my + pad_y), f"┌─ [ CYBERDECK // {m['name']} ]", font=f_corner, fill=NEON_CYAN)
+        draw.text((mx + pad_x, my + pad_y + int(16 * scale)), f"│  RES: {mw}x{mh} // ENCRYPT: AES-256", font=f_corner, fill=MUTED_TEXT)
+        
+        # Top-Right
+        draw.text((mx + mw - pad_x, my + pad_y), "[ FIREWALL: ARMORED ] ─┐", font=f_corner, fill=NEON_PINK, anchor="ra")
+        draw.text((mx + mw - pad_x, my + pad_y + int(16 * scale)), "SYS_INTEGRITY: 100% │", font=f_corner, fill=MUTED_TEXT, anchor="ra")
+        
+        # Bottom-Left
+        draw.text((mx + pad_x, my + mh - pad_y - int(16 * scale)), "│  KERNEL: LINUX_x86_64 // i3-NEO", font=f_corner, fill=MUTED_TEXT)
+        draw.text((mx + pad_x, my + mh - pad_y), "└─ [ SESSION: STANDBY ]", font=f_corner, fill=NEON_CYAN)
+        
+        # Bottom-Right
+        draw.text((mx + mw - pad_x, my + mh - pad_y - int(16 * scale)), "PORT: PAM_AUTH // TTY1 │", font=f_corner, fill=MUTED_TEXT, anchor="ra")
+        draw.text((mx + mw - pad_x, my + mh - pad_y), "[ READY FOR DECRYPT ] ─┘", font=f_corner, fill=NEON_AMBER, anchor="ra")
 
     canvas.save(OUTPUT_LOCK_IMG, "PNG", compress_level=1)
-    # Output the background hex color for i3lock -c
     print(f"BG_HEX={BG_HEX}")
 
 if __name__ == "__main__":
