@@ -165,14 +165,7 @@ def draw_tracked_text(draw, cx, cy, text, font, fill, spacing=6):
         cur_x += widths[i] + spacing
 
 def draw_enso_circle(draw, cx, cy, r_base, scale):
-    """Draws an authentic Zen Ensō brush circle with a deep black inner void (Mu / 無)."""
-    # Pure deep Sumi black inner void in the center of the ring
-    r_inner = r_base - int(10 * scale)
-    draw.ellipse(
-        [(cx - r_inner, cy - r_inner), (cx + r_inner, cy + r_inner)],
-        fill=(10, 9, 11, 245)
-    )
-
+    """Draws an authentic Zen Ensō brush circle."""
     segments = 120
     start_angle = -2.4
     end_angle = 3.3
@@ -266,11 +259,9 @@ def generate_lock_image():
         kanji_y = clock_y + int(54 * scale)
         draw_tracked_text(draw, cx, kanji_y, "天 下 無 双", f_kanji_header, WASHI_WHITE, spacing=int(14 * scale))
         
-        # Date & Hanko Seal
+        # Date (Centered, red box removed)
         date_y = kanji_y + int(34 * scale)
-        draw_tracked_text(draw, cx - int(24 * scale), date_y, date_str, f_date, INK_MUTED, spacing=int(3 * scale))
-        hanko_x = cx + int(120 * scale)
-        draw_hanko_seal(draw, hanko_x, date_y, "武蔵", int(26 * scale))
+        draw_tracked_text(draw, cx, date_y, date_str, f_date, INK_MUTED, spacing=int(4 * scale))
         
         # ---------------------------------------------------------------------
         # 3. The Single Quote (Bigger & Bolder, in the Middle of the Screen)

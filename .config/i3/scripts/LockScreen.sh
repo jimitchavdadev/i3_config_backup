@@ -35,7 +35,7 @@ fi
 # Launch the magical disappearing unlock fader overlay in background underneath i3lock
 FADER_PID=""
 if [ -f "$OUTPUT_LOCK_IMG" ] && [ -x "$FADER_SCRIPT" ]; then
-    coproc FADER { "$FADER_SCRIPT" --bg "$OUTPUT_LOCK_IMG" --duration 0.65; }
+    coproc FADER { "$FADER_SCRIPT" --bg "$OUTPUT_LOCK_IMG" --duration 0.72; }
     FADER_PID="${FADER_PID:-$!}"
     # Wait briefly for overlay window to report READY
     read -r -t 1 -u "${FADER[0]}" _ 2>/dev/null || true
