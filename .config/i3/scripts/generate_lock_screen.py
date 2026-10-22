@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Cyberpunk Multi-Monitor Lock Screen Generator for i3
-Renders high-tech HUD elements, digital neon glow clock, chamfered user badge,
-reticle targeting frame around i3lock indicator, scanlines, and corner telemetry.
+Blade Runner 2049 Multi-Monitor Screen Locker for i3
+Philosophical, futuristic, and atmospheric design inspired by Denis Villeneuve & Roger Deakins.
+Features Wallace Corp typography, Baseline Test echoes, warm amber atmospheric haze,
+tracked lettering, and an ultra-delicate circular reticle framing i3lock's indicator.
 """
 
 import os
@@ -16,14 +17,14 @@ BASE_CACHE_IMG = "/tmp/i3lock_blurred_base.png"
 BASE_CACHE_META = "/tmp/i3lock_base.meta"
 OUTPUT_LOCK_IMG = "/tmp/i3lock_aesthetic.png"
 
-# Cyberpunk Theme Colors
-BG_HEX = "1A1313"
-BG_COLOR = (22, 17, 24)
-FG_COLOR = (218, 245, 253)
-NEON_CYAN = (21, 191, 245)
-NEON_PINK = (242, 146, 223)
-NEON_AMBER = (246, 178, 105)
-MUTED_TEXT = (112, 170, 188)
+# Blade Runner 2049 Palette (Roger Deakins Cinematic Grade)
+BG_HEX = "120E10"
+BG_COLOR = (18, 14, 16)             # Deep obsidian / umber shadow
+IVORY_WHITE = (245, 238, 224)       # Warm ivory / cream white
+AMBER_GOLD = (235, 150, 70)         # Wallace Corp Golden Amber
+MUTED_AMBER = (180, 115, 65)        # Weathered sepia / desert bronze
+MIST_SLATE = (165, 178, 185)        # Atmospheric fog / rain slate
+HAZE_TINT = (35, 20, 15)            # Warm ambient cinematic haze
 
 def hex_to_rgb(h):
     h = h.strip().lstrip("#")
@@ -32,7 +33,7 @@ def hex_to_rgb(h):
     return None
 
 def load_theme_colors():
-    global BG_HEX, BG_COLOR, FG_COLOR, NEON_CYAN, NEON_PINK, NEON_AMBER, MUTED_TEXT
+    global BG_HEX, BG_COLOR, IVORY_WHITE, AMBER_GOLD, MUTED_AMBER, MIST_SLATE
     colors_file = os.path.expanduser("~/.config/polybar/colors.ini")
     if os.path.isfile(colors_file):
         try:
@@ -47,19 +48,13 @@ def load_theme_colors():
                             BG_HEX = raw
                     elif line.startswith("foreground ="):
                         c = hex_to_rgb(line.split("=")[1])
-                        if c: FG_COLOR = c
-                    elif line.startswith("color9 =") or line.startswith("color14 ="):
+                        if c: IVORY_WHITE = c
+                    elif line.startswith("color13 =") or line.startswith("primary ="):
                         c = hex_to_rgb(line.split("=")[1])
-                        if c: NEON_CYAN = c
-                    elif line.startswith("color10 ="):
+                        if c: AMBER_GOLD = c
+                    elif line.startswith("secondary =") or line.startswith("disabled ="):
                         c = hex_to_rgb(line.split("=")[1])
-                        if c: NEON_PINK = c
-                    elif line.startswith("color13 =") or line.startswith("color11 ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: NEON_AMBER = c
-                    elif line.startswith("secondary ="):
-                        c = hex_to_rgb(line.split("=")[1])
-                        if c: MUTED_TEXT = c
+                        if c: MIST_SLATE = c
         except Exception:
             pass
 
@@ -111,6 +106,7 @@ def get_wallpaper_path():
     return None
 
 def cover_and_blur(src_img, tw, th):
+    """Aspect-fill (cover) crop and smooth Gaussian blur."""
     iw, ih = src_img.size
     dw = max(1, tw // 3)
     dh = max(1, th // 3)
@@ -143,16 +139,14 @@ def build_blurred_base(monitors, tw, th, wall_path):
         bg_m = cover_and_blur(src_wall, mw, mh)
         canvas.paste(bg_m, (mx, my))
 
-    # Dark cyber vignette overlay
-    overlay = Image.new("RGBA", (tw, th), (8, 6, 12, 135))
-    canvas = Image.alpha_composite(canvas, overlay)
+    # Roger Deakins Atmospheric Color Grade:
+    # 1. Warm amber/sepia haze wash (Wallace Corp / desert ruin ambient glow)
+    amber_haze = Image.new("RGBA", (tw, th), (*HAZE_TINT, 75))
+    canvas = Image.alpha_composite(canvas, amber_haze)
 
-    # Subtle horizontal cyber scanlines
-    scanlines = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    sdraw = ImageDraw.Draw(scanlines)
-    for y in range(0, th, 4):
-        sdraw.line([(0, y), (tw, y)], fill=(0, 0, 0, 35))
-    canvas = Image.alpha_composite(canvas, scanlines)
+    # 2. Cinematic deep vignette
+    vignette = Image.new("RGBA", (tw, th), (10, 8, 10, 125))
+    canvas = Image.alpha_composite(canvas, vignette)
 
     base_rgb = canvas.convert("RGB")
     base_rgb.save(BASE_CACHE_IMG, "PNG", compress_level=1)
@@ -183,6 +177,17 @@ def get_or_create_base(monitors, tw, th, wall_path):
             
     return build_blurred_base(monitors, tw, th, wall_path)
 
+def draw_tracked_text(draw, cx, cy, text, font, fill, spacing=6):
+    """Draw text with tracked letter spacing centered at (cx, cy)."""
+    chars = list(text)
+    boxes = [draw.textbbox((0, 0), ch, font=font) for ch in chars]
+    widths = [b[2] - b[0] for b in boxes]
+    total_w = sum(widths) + (len(chars) - 1) * spacing
+    cur_x = cx - (total_w / 2)
+    for i, ch in enumerate(chars):
+        draw.text((cur_x, cy), ch, font=font, fill=fill, anchor="lm")
+        cur_x += widths[i] + spacing
+
 def generate_lock_image():
     load_theme_colors()
     monitors, tw, th = get_monitors()
@@ -201,8 +206,10 @@ def generate_lock_image():
     font_reg_path = os.path.expanduser("~/.local/share/fonts/JetBrainsMono/JetBrainsMonoNerdFont-Regular.ttf")
 
     now = datetime.now()
-    time_str = now.strftime("%H:%M")
-    date_str = now.strftime("%A // %d %B %Y").upper()
+    time_raw = now.strftime("%H:%M")
+    # Spaced clock: 1 4 : 4 5
+    time_spaced = f"{time_raw[0]} {time_raw[1]} : {time_raw[3]} {time_raw[4]}"
+    date_str = now.strftime("%B %d, %Y  ·  EARTH STANDARD").upper()
     user_name = os.environ.get("USER", "jimitchavda").upper()
 
     for m in monitors:
@@ -212,149 +219,103 @@ def generate_lock_image():
         cy = my + (mh // 2)
         scale = mh / 1080.0
         
-        # Scale fonts
-        time_size = int(90 * scale)
-        date_size = int(17 * scale)
-        badge_size = int(13 * scale)
-        hud_size = int(12 * scale)
-        corner_size = int(11 * scale)
+        # Proportional typographic scale
+        time_size = int(88 * scale)
+        date_size = int(14 * scale)
+        badge_size = int(12 * scale)
+        hud_size = int(11 * scale)
+        corner_size = int(10 * scale)
         
         try:
             f_time = ImageFont.truetype(font_bold_path, time_size)
             f_date = ImageFont.truetype(font_reg_path, date_size)
-            f_badge = ImageFont.truetype(font_bold_path, badge_size)
-            f_hud = ImageFont.truetype(font_bold_path, hud_size)
+            f_badge = ImageFont.truetype(font_reg_path, badge_size)
+            f_hud = ImageFont.truetype(font_reg_path, hud_size)
             f_corner = ImageFont.truetype(font_reg_path, corner_size)
         except Exception:
             f_time = f_date = f_badge = f_hud = f_corner = ImageFont.load_default()
         
         # ---------------------------------------------------------------------
-        # 1. Central Cyberpunk HUD Reticle around i3lock ring
+        # 1. Minimalist Blade Runner Reticle around i3lock ring (radius 95px)
         # ---------------------------------------------------------------------
-        r_hud = int(118 * scale)
-        bracket_len = int(24 * scale)
+        r_reticle = int(114 * scale)
         
-        # Glowing Corner Tech Brackets
-        draw.line([(cx - r_hud, cy - r_hud + bracket_len), (cx - r_hud, cy - r_hud), (cx - r_hud + bracket_len, cy - r_hud)], fill=NEON_CYAN, width=2)
-        draw.line([(cx + r_hud - bracket_len, cy - r_hud), (cx + r_hud, cy - r_hud), (cx + r_hud, cy - r_hud + bracket_len)], fill=NEON_CYAN, width=2)
-        draw.line([(cx - r_hud, cy + r_hud - bracket_len), (cx - r_hud, cy + r_hud), (cx - r_hud + bracket_len, cy + r_hud)], fill=NEON_CYAN, width=2)
-        draw.line([(cx + r_hud - bracket_len, cy + r_hud), (cx + r_hud, cy + r_hud), (cx + r_hud, cy + r_hud - bracket_len)], fill=NEON_CYAN, width=2)
+        # Delicate hairline ring
+        draw.ellipse(
+            [cx - r_reticle, cy - r_reticle, cx + r_reticle, cy + r_reticle],
+            outline=(*AMBER_GOLD, 100),
+            width=1
+        )
         
-        # Concentric HUD arcs (Neon Pink)
-        arc_inset = int(10 * scale)
-        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=30, end=60, fill=NEON_PINK, width=2)
-        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=120, end=150, fill=NEON_PINK, width=2)
-        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=210, end=240, fill=NEON_PINK, width=2)
-        draw.arc([cx - r_hud + arc_inset, cy - r_hud + arc_inset, cx + r_hud - arc_inset, cy + r_hud - arc_inset], start=300, end=330, fill=NEON_PINK, width=2)
+        # Cardinal crosshair tick marks
+        tick_len = int(8 * scale)
+        draw.line([(cx - r_reticle - tick_len, cy), (cx - r_reticle + tick_len, cy)], fill=(*AMBER_GOLD, 180), width=1)
+        draw.line([(cx + r_reticle - tick_len, cy), (cx + r_reticle + tick_len, cy)], fill=(*AMBER_GOLD, 180), width=1)
+        draw.line([(cx, cy - r_reticle - tick_len), (cx, cy - r_reticle + tick_len)], fill=(*AMBER_GOLD, 180), width=1)
+        draw.line([(cx, cy + r_reticle - tick_len), (cx, cy + r_reticle + tick_len)], fill=(*AMBER_GOLD, 180), width=1)
         
-        # Crosshair alignment ticks
-        tick_in = r_hud + int(6 * scale)
-        tick_out = r_hud + int(16 * scale)
-        draw.line([(cx - tick_out, cy), (cx - tick_in, cy)], fill=NEON_CYAN, width=1)
-        draw.line([(cx + tick_in, cy), (cx + tick_out, cy)], fill=NEON_CYAN, width=1)
-        draw.line([(cx, cy - tick_out), (cx, cy - tick_in)], fill=NEON_CYAN, width=1)
-        draw.line([(cx, cy + tick_in), (cx, cy + tick_out)], fill=NEON_CYAN, width=1)
-        
-        # Reticle Top Tag
-        reticle_tag = "[ BIOMETRIC // LOCK ]"
-        draw.text((cx, cy - r_hud - int(12 * scale)), reticle_tag, font=f_hud, fill=NEON_PINK, anchor="ms")
+        # Baseline markers
+        draw_tracked_text(draw, cx, cy - r_reticle - int(16 * scale), "·  B A S E L I N E  ·", f_hud, AMBER_GOLD, spacing=int(4 * scale))
+        draw_tracked_text(draw, cx, cy + r_reticle + int(16 * scale), "I N T E R L I N K E D", f_hud, (*AMBER_GOLD, 160), spacing=int(4 * scale))
         
         # ---------------------------------------------------------------------
-        # 2. Clock & Date (Above Reticle with guaranteed clearance)
+        # 2. Clock & Date (Above the Reticle with guaranteed clearance)
         # ---------------------------------------------------------------------
-        clock_y = cy - r_hud - int(160 * scale)
+        clock_y = cy - r_reticle - int(165 * scale)
         
-        # Neon Glow pass for Clock
+        # Soft ambient warm glow behind clock
         for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1)]:
-            draw.text((cx + ox, clock_y + oy), time_str, font=f_time, fill=(*NEON_CYAN, 70), anchor="mm")
-        # Crisp core
-        draw.text((cx, clock_y), time_str, font=f_time, fill=FG_COLOR, anchor="mm")
+            draw.text((cx + ox, clock_y + oy), time_spaced, font=f_time, fill=(*AMBER_GOLD, 50), anchor="mm")
+        # Crisp ivory core
+        draw.text((cx, clock_y), time_spaced, font=f_time, fill=IVORY_WHITE, anchor="mm")
         
-        # Tech divider line with center diamond
-        div_w = int(170 * scale)
+        # Minimalist hairline divider with center dot
+        div_w = int(140 * scale)
         div_y = clock_y + int(48 * scale)
-        draw.line([(cx - div_w, div_y), (cx - 16, div_y)], fill=(*NEON_CYAN, 160), width=1)
-        draw.polygon([(cx - 5, div_y), (cx, div_y - 4), (cx + 5, div_y), (cx, div_y + 4)], fill=NEON_PINK)
-        draw.line([(cx + 16, div_y), (cx + div_w, div_y)], fill=(*NEON_CYAN, 160), width=1)
+        draw.line([(cx - div_w, div_y), (cx - 10, div_y)], fill=(*AMBER_GOLD, 100), width=1)
+        draw.ellipse([cx - 2, div_y - 2, cx + 2, div_y + 2], fill=AMBER_GOLD)
+        draw.line([(cx + 10, div_y), (cx + div_w, div_y)], fill=(*AMBER_GOLD, 100), width=1)
         
         # Date
         date_y = div_y + int(18 * scale)
-        draw.text((cx, date_y), date_str, font=f_date, fill=NEON_CYAN, anchor="mm")
+        draw_tracked_text(draw, cx, date_y, date_str, f_date, (*AMBER_GOLD, 210), spacing=int(2 * scale))
+        
+        # Replicant / Identity line
+        id_y = date_y + int(32 * scale)
+        id_text = f"NEXUS-9  //  SERIAL: KD6-3.7  ·  {user_name}"
+        draw_tracked_text(draw, cx, id_y, id_text, f_badge, (*MIST_SLATE, 190), spacing=int(2 * scale))
         
         # ---------------------------------------------------------------------
-        # 3. Chamfered Sci-Fi User Badge
+        # 3. Prompt (Below the Reticle)
         # ---------------------------------------------------------------------
-        badge_y = date_y + int(38 * scale)
-        badge_text = f"// USER: {user_name} // NODE: 0x7F //"
-        bb = draw.textbbox((0, 0), badge_text, font=f_badge)
-        bw = bb[2] - bb[0]
-        bh = bb[3] - bb[1]
+        prompt_y = cy + r_reticle + int(54 * scale)
+        prompt_text = "CELLS INTERLINKED  ·  ENTER KEY TO CONFIRM BASELINE"
+        draw_tracked_text(draw, cx, prompt_y, prompt_text, f_hud, (*IVORY_WHITE, 180), spacing=int(3 * scale))
         
-        pw = bw + int(32 * scale)
-        ph = bh + int(14 * scale)
-        px1 = cx - (pw // 2)
-        py1 = badge_y - (ph // 2)
-        px2 = px1 + pw
-        py2 = py1 + ph
-        chamfer = int(6 * scale)
-        
-        badge_poly = [
-            (px1 + chamfer, py1),
-            (px2 - chamfer, py1),
-            (px2, py1 + chamfer),
-            (px2, py2 - chamfer),
-            (px2 - chamfer, py2),
-            (px1 + chamfer, py2),
-            (px1, py2 - chamfer),
-            (px1, py1 + chamfer)
-        ]
-        draw.polygon(badge_poly, fill=(24, 18, 28, 220), outline=NEON_PINK)
-        draw.text((cx, badge_y), badge_text, font=f_badge, fill=FG_COLOR, anchor="mm")
+        prompt_sub = ">> [  .  .  .  .  .  .  .  .  ]"
+        draw.text((cx, prompt_y + int(22 * scale)), prompt_sub, font=f_hud, fill=(*AMBER_GOLD, 140), anchor="mm")
         
         # ---------------------------------------------------------------------
-        # 4. Input Command Prompt (Below Reticle with guaranteed clearance)
+        # 4. Corner Telemetry (Literary, Philosophical, Wallace Corp)
         # ---------------------------------------------------------------------
-        prompt_y = cy + r_hud + int(36 * scale)
-        prompt_w = int(320 * scale)
-        prompt_h = int(34 * scale)
-        pr_x1 = cx - (prompt_w // 2)
-        pr_y1 = prompt_y
-        pr_x2 = pr_x1 + prompt_w
-        pr_y2 = pr_y1 + prompt_h
+        pad_x = int(46 * scale)
+        pad_y = int(38 * scale)
         
-        # Cyber bracket container
-        draw.line([(pr_x1, pr_y1), (pr_x1 + 12, pr_y1)], fill=NEON_CYAN, width=1)
-        draw.line([(pr_x1, pr_y1), (pr_x1, pr_y2)], fill=NEON_CYAN, width=1)
-        draw.line([(pr_x1, pr_y2), (pr_x1 + 12, pr_y2)], fill=NEON_CYAN, width=1)
+        # Top-Left: Wallace Corp Header
+        draw.text((mx + pad_x, my + pad_y), "WALLACE CORP.  //  MEMORY ARCHIVE", font=f_corner, fill=(*AMBER_GOLD, 190))
+        draw.text((mx + pad_x, my + pad_y + int(16 * scale)), f"SECTOR 04  ·  UNIT: {m['name']}  ·  {mw}x{mh}", font=f_corner, fill=(*MIST_SLATE, 130))
         
-        draw.line([(pr_x2 - 12, pr_y1), (pr_x2, pr_y1)], fill=NEON_CYAN, width=1)
-        draw.line([(pr_x2, pr_y1), (pr_x2, pr_y2)], fill=NEON_CYAN, width=1)
-        draw.line([(pr_x2 - 12, pr_y2), (pr_x2, pr_y2)], fill=NEON_CYAN, width=1)
+        # Top-Right: Baseline Status
+        draw.text((mx + mw - pad_x, my + pad_y), "POST-BLACKOUT RECORD  ·  2049", font=f_corner, fill=(*AMBER_GOLD, 190), anchor="ra")
+        draw.text((mx + mw - pad_x, my + pad_y + int(16 * scale)), "STATUS: CONSTANT", font=f_corner, fill=(*MIST_SLATE, 130), anchor="ra")
         
-        prompt_text = ">> ENTER ACCESS CIPHER [ _ ]"
-        draw.text((cx, prompt_y + (prompt_h // 2)), prompt_text, font=f_hud, fill=NEON_AMBER, anchor="mm")
+        # Bottom-Left: Iconic Blade Runner Philosophy
+        draw.text((mx + pad_x, my + mh - pad_y - int(16 * scale)), "“All those moments will be lost in time, like tears in rain.”", font=f_corner, fill=(*MIST_SLATE, 120))
+        draw.text((mx + pad_x, my + mh - pad_y), "ROY BATTY  ·  2019  ·  TYRELL ARCHIVES", font=f_corner, fill=(*MUTED_AMBER, 110))
         
-        # ---------------------------------------------------------------------
-        # 5. Screen Corner HUD Telemetry
-        # ---------------------------------------------------------------------
-        pad_x = int(38 * scale)
-        pad_y = int(32 * scale)
-        
-        # Top-Left
-        draw.text((mx + pad_x, my + pad_y), f"┌─ [ CYBERDECK // {m['name']} ]", font=f_corner, fill=NEON_CYAN)
-        draw.text((mx + pad_x, my + pad_y + int(16 * scale)), f"│  RES: {mw}x{mh} // ENCRYPT: AES-256", font=f_corner, fill=MUTED_TEXT)
-        
-        # Top-Right
-        draw.text((mx + mw - pad_x, my + pad_y), "[ FIREWALL: ARMORED ] ─┐", font=f_corner, fill=NEON_PINK, anchor="ra")
-        draw.text((mx + mw - pad_x, my + pad_y + int(16 * scale)), "SYS_INTEGRITY: 100% │", font=f_corner, fill=MUTED_TEXT, anchor="ra")
-        
-        # Bottom-Left
-        draw.text((mx + pad_x, my + mh - pad_y - int(16 * scale)), "│  KERNEL: LINUX_x86_64 // i3-NEO", font=f_corner, fill=MUTED_TEXT)
-        draw.text((mx + pad_x, my + mh - pad_y), "└─ [ SESSION: STANDBY ]", font=f_corner, fill=NEON_CYAN)
-        
-        # Bottom-Right
-        draw.text((mx + mw - pad_x, my + mh - pad_y - int(16 * scale)), "PORT: PAM_AUTH // TTY1 │", font=f_corner, fill=MUTED_TEXT, anchor="ra")
-        draw.text((mx + mw - pad_x, my + mh - pad_y), "[ READY FOR DECRYPT ] ─┘", font=f_corner, fill=NEON_AMBER, anchor="ra")
+        # Bottom-Right: Baseline Prompt Echo
+        draw.text((mx + mw - pad_x, my + mh - pad_y - int(16 * scale)), "“A system of cells interlinked within cells...”", font=f_corner, fill=(*MIST_SLATE, 120), anchor="ra")
+        draw.text((mx + mw - pad_x, my + mh - pad_y), "[ AWAITING PASSPHRASE ]", font=f_corner, fill=(*AMBER_GOLD, 170), anchor="ra")
 
     canvas.save(OUTPUT_LOCK_IMG, "PNG", compress_level=1)
     print(f"BG_HEX={BG_HEX}")
