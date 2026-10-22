@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
-# Terminate already running bar and drawer instances
+# ==================================================
+#  Polybar Multi-Monitor & Floating Tray Launcher
+# ==================================================
 killall -q polybar 2>/dev/null || true
 pkill -f hover_drawer.sh 2>/dev/null || true
 while pgrep -u $UID -x polybar >/dev/null; do sleep 0.1; done
 
 export DISPLAY="${DISPLAY:-:0}"
+
+# 1. Launch floating tray bar first to claim X11 system tray selection
+setsid polybar -c "$HOME/.config/polybar/config.ini" tray </dev/null >/dev/null 2>&1 &
+sleep 0.5
+
+# Immediately hide the floating tray so it starts in collapsed state
+TRAY_WID=$(xdotool search --name "polybar-tray" 2>/dev/null | head -n 1 || true)
+if [ -n "$TRAY_WID" ]; then
+    xdotool windowunmap "$TRAY_WID" 2>/dev/null || true
+fi
+
+# Reset drawer state
+echo 0 > /tmp/polybar_tray_drawer_state
 
 if command -v xrandr >/dev/null 2>&1; then
     # Detect external connected display
@@ -20,20 +35,18 @@ if command -v xrandr >/dev/null 2>&1; then
         fi
     fi
 
-    # 1. Launch on PRIMARY (external when present) first so it acquires the system tray
-    MONITOR=$PRIMARY nohup polybar --reload -c "$HOME/.config/polybar/config.ini" main >/dev/null 2>&1 &
-    sleep 0.4
+    # Launch main bar on primary monitor
+    MONITOR=$PRIMARY setsid polybar --reload -c "$HOME/.config/polybar/config.ini" main </dev/null >/dev/null 2>&1 &
 
-    # 2. Launch secondary bar on other active monitors
+    # Launch secondary bar on other active monitors
     for m in $(xrandr --query 2>/dev/null | grep -E " connected (primary )?[0-9]+x[0-9]+" | cut -d" " -f1); do
         if [ "$m" != "$PRIMARY" ]; then
-            MONITOR=$m nohup polybar --reload -c "$HOME/.config/polybar/config.ini" secondary >/dev/null 2>&1 &
+            MONITOR=$m setsid polybar --reload -c "$HOME/.config/polybar/config.ini" secondary </dev/null >/dev/null 2>&1 &
         fi
     done
 else
-    nohup polybar --reload -c "$HOME/.config/polybar/config.ini" main >/dev/null 2>&1 &
+    setsid polybar --reload -c "$HOME/.config/polybar/config.ini" main </dev/null >/dev/null 2>&1 &
 fi
 
 # Launch hover detector daemon in background
-nohup "$HOME/.config/polybar/scripts/hover_drawer.sh" >/dev/null 2>&1 &
-disown -a 2>/dev/null || true
+setsid "$HOME/.config/polybar/scripts/hover_drawer.sh" </dev/null >/dev/null 2>&1 &
