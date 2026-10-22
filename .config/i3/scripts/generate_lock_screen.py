@@ -165,7 +165,14 @@ def draw_tracked_text(draw, cx, cy, text, font, fill, spacing=6):
         cur_x += widths[i] + spacing
 
 def draw_enso_circle(draw, cx, cy, r_base, scale):
-    """Draws an authentic Zen Ensō brush circle framing the 95px i3lock ring."""
+    """Draws an authentic Zen Ensō brush circle with a deep black inner void (Mu / 無)."""
+    # Pure deep Sumi black inner void in the center of the ring
+    r_inner = r_base - int(10 * scale)
+    draw.ellipse(
+        [(cx - r_inner, cy - r_inner), (cx + r_inner, cy + r_inner)],
+        fill=(10, 9, 11, 245)
+    )
+
     segments = 120
     start_angle = -2.4
     end_angle = 3.3
