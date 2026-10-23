@@ -35,7 +35,7 @@ fi
 # Launch the magical disappearing unlock fader overlay in background underneath i3lock
 FADER_PID=""
 if [ -f "$OUTPUT_LOCK_IMG" ] && [ -x "$FADER_SCRIPT" ]; then
-    coproc FADER { "$FADER_SCRIPT" --bg "$OUTPUT_LOCK_IMG" --duration 0.72; }
+    coproc FADER { exec "$FADER_SCRIPT" --bg "$OUTPUT_LOCK_IMG" --duration 0.72; }
     FADER_PID="${FADER_PID:-$!}"
     # Wait briefly for overlay window to report READY
     read -r -t 1 -u "${FADER[0]}" _ 2>/dev/null || true
@@ -48,27 +48,35 @@ fi
 # -f: show failed attempt counter
 # -n: nofork (clean integration with systemd/xss-lock)
 # -u: --no-unlock-indicator (makes the middle circle completely black/invisible when clicked or typed)
-# --debug: debug mode (emits 'Authentication failure' and 'auth_state = 3' on PAM wrong password)
+# --debug: debug mode (emits 'Authentication failure' on PAM wrong password)
 if [ -f "$OUTPUT_LOCK_IMG" ]; then
     LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -i "$OUTPUT_LOCK_IMG" -e -f -n -u --debug)
 else
     LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -e -f -n -u --debug)
 fi
 
-# Run i3lock with unbuffered pipes and monitor for Authentication failure in real-time
+# If invoked by xss-lock before suspend/sleep, release delay lock once locker is active
+# so logind can proceed to suspend without waiting for locker to exit
+if [[ -n "${XSS_SLEEP_LOCK_FD:-}" ]] && [[ -e "/dev/fd/$XSS_SLEEP_LOCK_FD" ]]; then
+    (
+        sleep 0.3
+        eval "exec ${XSS_SLEEP_LOCK_FD}<&-" 2>/dev/null || true
+    ) &
+fi
+
+# Run i3lock and monitor for Authentication failure in real-time
 while IFS= read -r line; do
     if [[ "$line" == *"Authentication failure"* || "$line" == *"auth_state = 3"* ]]; then
         if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
-            echo "WRONG" >&"${FADER[1]}" 2>/dev/null || true
-            kill -USR2 "$FADER_PID" 2>/dev/null || true
+            echo "WRONG" >&"${FADER[1]}" 2>/dev/null || kill -USR2 "$FADER_PID" 2>/dev/null || true
         fi
     fi
-done < <(stdbuf -i0 -o0 -e0 i3lock "${LOCK_ARGS[@]}" 2>&1)
+done < <(i3lock "${LOCK_ARGS[@]}" 2>&1)
 
 # On successful password entry (i3lock exits cleanly):
 # Trigger the magical disappearing animation to smoothly dissolve into the desktop
 if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
-    echo "DISAPPEAR" >&"${FADER[1]}" 2>/dev/null || true
-    kill -USR1 "$FADER_PID" 2>/dev/null || true
+    echo "DISAPPEAR" >&"${FADER[1]}" 2>/dev/null || kill -USR1 "$FADER_PID" 2>/dev/null || true
     wait "$FADER_PID" 2>/dev/null || true
 fi
+

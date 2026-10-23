@@ -433,6 +433,12 @@ class BloodKatanaFader:
                     elif code == 14:  # BACKSPACE
                         self.keys_typed = max(0, self.keys_typed - 1)
                         self.trigger_keystroke_slash(is_backspace=True)
+                    elif code == 1:  # ESCAPE
+                        self.keys_typed = 0
+                        self.has_typed = False
+                        if self.wrong_eyes:
+                            self.wrong_eyes.clear()
+                            self.window.queue_draw()
                     elif code in (42, 54, 29, 97, 56, 100, 125, 126):  # Modifiers (Shift, Ctrl, Alt, Super)
                         pass
                     else:  # Normal keystroke
@@ -613,6 +619,8 @@ class BloodKatanaFader:
         """Reads raw bytes from stdin without libc buffering."""
         try:
             raw = os.read(fd, 1024).decode('utf-8', errors='ignore')
+            if not raw:
+                return False
             for line in raw.splitlines():
                 cmd = line.strip()
                 if cmd == "WRONG":
@@ -620,7 +628,7 @@ class BloodKatanaFader:
                 elif cmd == "DISAPPEAR":
                     self.trigger_final_disappear()
         except Exception:
-            pass
+            return False
         return True
 
     def on_sig_disappear(self, signum, frame):
