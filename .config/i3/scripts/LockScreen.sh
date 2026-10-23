@@ -48,16 +48,16 @@ fi
 # -f: show failed attempt counter
 # -n: nofork (clean integration with systemd/xss-lock)
 # -u: --no-unlock-indicator (makes the middle circle completely black/invisible when clicked or typed)
-# -d: debug mode (emits 'Authentication failure' on PAM wrong password)
+# --debug: debug mode (emits 'Authentication failure' and 'auth_state = 3' on PAM wrong password)
 if [ -f "$OUTPUT_LOCK_IMG" ]; then
-    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -i "$OUTPUT_LOCK_IMG" -e -f -n -u -d)
+    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -i "$OUTPUT_LOCK_IMG" -e -f -n -u --debug)
 else
-    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -e -f -n -u -d)
+    LOCK_ARGS=(-c "${BG_HEX:-0F0E10}" -e -f -n -u --debug)
 fi
 
 # Run i3lock with unbuffered pipes and monitor for Authentication failure in real-time
 while IFS= read -r line; do
-    if [[ "$line" == *"Authentication failure"* ]]; then
+    if [[ "$line" == *"Authentication failure"* || "$line" == *"auth_state = 3"* ]]; then
         if [ -n "${FADER_PID:-}" ] && kill -0 "$FADER_PID" 2>/dev/null; then
             echo "WRONG" >&"${FADER[1]}" 2>/dev/null || true
             kill -USR2 "$FADER_PID" 2>/dev/null || true

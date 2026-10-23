@@ -460,7 +460,13 @@ class BloodKatanaFader:
     def trigger_wrong_password_eye(self):
         """Spawns the Demonic Eye in the center on wrong password."""
         if self.final_animating:
-            return
+            return False
+
+        # Debounce rapid triggers within 0.35s
+        now = time.time()
+        if hasattr(self, "_last_wrong_time") and (now - self._last_wrong_time) < 0.35:
+            return False
+        self._last_wrong_time = now
 
         if self.pending_auth_timer is not None:
             GLib.source_remove(self.pending_auth_timer)
@@ -478,6 +484,7 @@ class BloodKatanaFader:
             self.tick_timer_id = GLib.timeout_add(16, self.on_tick)
 
         self.window.queue_draw()
+        return False
 
     def eval_bezier(self, p0, pctrl, p1, u):
         omt = 1.0 - u
