@@ -2,7 +2,15 @@
 # Wallust + Feh color updater for i3
 set -euo pipefail
 
-passed_path="${1:-}"
+no_reload=0
+passed_path=""
+for arg in "$@"; do
+    if [[ "$arg" == "--no-reload" ]]; then
+        no_reload=1
+    elif [[ -z "$passed_path" && -f "$arg" ]]; then
+        passed_path="$arg"
+    fi
+done
 rofi_link="$HOME/.config/rofi/.current_wallpaper"
 wallpaper_current="$HOME/.config/i3/wallpaper_effects/.wallpaper_current"
 wallpaper_path=""
@@ -57,19 +65,21 @@ if pidof ghostty >/dev/null; then
     for pid in $(pidof ghostty); do kill -SIGUSR2 "$pid" 2>/dev/null || true; done
 fi
 
-# Reload Polybar
-if pidof polybar >/dev/null; then
-    polybar-msg cmd restart >/dev/null 2>&1 || ~/.config/polybar/launch.sh >/dev/null 2>&1 &
-fi
+if [[ "$no_reload" -eq 0 ]]; then
+    # Reload Polybar
+    if pidof polybar >/dev/null; then
+        polybar-msg cmd restart >/dev/null 2>&1 || true
+    fi
 
-# Reload Dunst
-if pidof dunst >/dev/null; then
-    dunstctl reload 2>/dev/null || killall -SIGUSR2 dunst 2>/dev/null || true
-fi
+    # Reload Dunst
+    if pidof dunst >/dev/null; then
+        dunstctl reload 2>/dev/null || killall -SIGUSR2 dunst 2>/dev/null || true
+    fi
 
-# Reload i3
-if command -v i3-msg >/dev/null 2>&1; then
-    i3-msg reload >/dev/null 2>&1 || true
+    # Reload i3
+    if command -v i3-msg >/dev/null 2>&1; then
+        i3-msg reload >/dev/null 2>&1 || true
+    fi
 fi
 
 # Pre-cache aesthetic lock screen background in background

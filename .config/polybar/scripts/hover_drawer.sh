@@ -5,6 +5,12 @@
 # Supports multi-monitor setups (eDP-1 + HDMI-1, etc.)
 set -euo pipefail
 
+LOCK_FILE="/tmp/hover_drawer.lock"
+exec 201>"$LOCK_FILE"
+if ! flock -n 201; then
+    exit 0
+fi
+
 sDIR="$HOME/.config/polybar/scripts"
 leave_count=0
 is_expanded=0

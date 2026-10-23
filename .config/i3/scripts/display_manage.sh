@@ -34,9 +34,8 @@ case "$action" in
         done
         xrandr --output "$PRIMARY" --auto --primary 2>/dev/null || true
         rescue_workspaces
-        i3-msg reload >/dev/null 2>&1 || true
         i3-msg "exec --no-startup-id $HOME/.config/polybar/launch.sh" >/dev/null 2>&1 || true
-        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh" >/dev/null 2>&1 || true
+        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh --no-reload" >/dev/null 2>&1 || true
         notify-send -i "$iDIR/ja.png" "Display" "Switched to Laptop display"
         ;;
 
@@ -51,9 +50,8 @@ case "$action" in
             notify-send -i "$iDIR/ja.png" "Display" "No external display found, using $PRIMARY"
         fi
         rescue_workspaces
-        i3-msg reload >/dev/null 2>&1 || true
         i3-msg "exec --no-startup-id $HOME/.config/polybar/launch.sh" >/dev/null 2>&1 || true
-        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh" >/dev/null 2>&1 || true
+        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh --no-reload" >/dev/null 2>&1 || true
         ;;
 
     "auto"|*)
@@ -65,8 +63,7 @@ case "$action" in
             xrandr --output "$out" --off 2>/dev/null || true
         done
         rescue_workspaces
-        i3-msg reload >/dev/null 2>&1 || true
         i3-msg "exec --no-startup-id $HOME/.config/polybar/launch.sh" >/dev/null 2>&1 || true
-        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh" >/dev/null 2>&1 || true
+        i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/WallustFeh.sh --no-reload" >/dev/null 2>&1 || true
         ;;
 esac
