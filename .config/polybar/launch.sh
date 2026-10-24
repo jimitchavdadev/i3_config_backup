@@ -64,17 +64,9 @@ echo 0 > /tmp/polybar_tray_drawer_state
 
 # 3. Detect displays and launch main/secondary bars
 if command -v xrandr >/dev/null 2>&1; then
-    # Detect external connected display
-    EXTERNAL=$(xrandr --query 2>/dev/null | grep -E " connected (primary )?[0-9]+x[0-9]+" | grep -v "eDP" | head -n 1 | cut -d" " -f1 || true)
-
-    if [ -n "$EXTERNAL" ]; then
-        PRIMARY="$EXTERNAL"
-        xrandr --output "$EXTERNAL" --primary 2>/dev/null || true
-    else
-        PRIMARY=$(xrandr --query 2>/dev/null | grep " connected primary" | cut -d" " -f1 || true)
-        if [ -z "$PRIMARY" ]; then
-            PRIMARY=$(xrandr --query 2>/dev/null | grep -E " connected (primary )?[0-9]+x[0-9]+" | head -n 1 | cut -d" " -f1 || echo "eDP-1")
-        fi
+    PRIMARY=$(xrandr --query 2>/dev/null | grep " connected primary" | cut -d" " -f1 || true)
+    if [ -z "$PRIMARY" ]; then
+        PRIMARY=$(xrandr --query 2>/dev/null | grep -E " connected (primary )?[0-9]+x[0-9]+" | head -n 1 | cut -d" " -f1 || echo "eDP-1")
     fi
 
     # Launch main bar on primary monitor

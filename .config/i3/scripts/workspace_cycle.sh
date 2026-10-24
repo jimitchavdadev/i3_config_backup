@@ -42,7 +42,13 @@ mapfile -t workspaces < <(echo "$ws_json" | jq -r --arg out "$current_output" 's
 
 total=${#workspaces[@]}
 if [ "$total" -le 1 ]; then
-    exit 0
+    # Fallback: if only 1 workspace exists on this monitor, cycle all open workspaces
+    # so navigation never gets dead-locked on the extended display
+    mapfile -t workspaces < <(echo "$ws_json" | jq -r 'sort_by(.num) | .[].name' || true)
+    total=${#workspaces[@]}
+    if [ "$total" -le 1 ]; then
+        exit 0
+    fi
 fi
 
 # 5. Find index of current focused workspace within this monitor's workspaces

@@ -147,6 +147,12 @@ bindsym $mod+bracketleft exec --no-startup-id ~/.config/i3/scripts/workspace_cyc
 bindsym $mod+Shift+bracketright move container to workspace next
 bindsym $mod+Shift+bracketleft move container to workspace prev
 
+# Multi-Monitor Display Movement
+bindsym $mod+Ctrl+o move workspace to output next
+bindsym $mod+Ctrl+Shift+o move container to output next
+bindsym $mod+Ctrl+F9 move workspace to output left
+bindsym $mod+Ctrl+F10 move workspace to output right
+
 # Scratchpad
 bindsym $mod+u [instance="dropdown_terminal"] scratchpad show
 bindsym $mod+Shift+u move scratchpad
